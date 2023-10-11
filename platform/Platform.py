@@ -24,6 +24,14 @@ class Platform:
 
         return raw.json()
 
+    def _get_output_dir(self):
+        base_path = os.getenv('OUTPUT_DIRECTORY')
+        if not base_path:
+            # Assuming we're in Docker mode ;-)
+            base_path = '/app/output'
+
+        return base_path
+
     def _get_env(self, key):
         env_value = os.getenv(key)
         if not env_value:

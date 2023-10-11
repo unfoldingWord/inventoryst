@@ -107,7 +107,7 @@ class ReadtheDocs(Platform):
     def __export_to_markdown_files(self, inventory):
         # pprint(inventory)
 
-        base_path = self._get_env('OUTPUT_DIRECTORY')
+        base_path = self._get_output_dir()
         platform_file = self._get_env('READTHEDOCS_MD_FILE')
 
         if not os.path.exists(base_path):
