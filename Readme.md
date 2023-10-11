@@ -21,7 +21,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4) Configure your `.env` file
+4) Configure your `.env` file\
 Use the file `example.env` for guidance
 
 5) Run the script
@@ -35,7 +35,7 @@ python main.py
 docker pull unfoldingword/inventoryst
 ```
 
-2) Configure the .env file
+2) Configure the .env file\
 Use the file `example.env` for guidance
 
 3) Run your container
