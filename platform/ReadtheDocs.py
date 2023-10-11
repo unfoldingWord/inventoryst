@@ -126,11 +126,13 @@ class ReadtheDocs(Platform):
                 created = parser.parse(item['created']).strftime("%B %-d, %Y")
                 last_modified = parser.parse(item['last_modified']).strftime("%B %-d, %Y")
 
+                build_color = "green" if item["last_build_status"] == 'success' else "red"
+
                 md_file.write("### [" + item['name'] + "](" + item['home'] + ")\n")
                 md_file.write("**Created:** " + created + "\n")
                 md_file.write("**Last modified:** " + last_modified + "\n")
                 md_file.write("**Last built:** " + item['last_build'] +
-                              r" **\[" + item["last_build_status"] + r"\]**" + "\n")
+                              f"<span style=\"color: {build_color}; font-weight: bold\"> [" + item["last_build_status"] + "]</span>" + "\n")
                 md_file.write("**Repository:** " + item['repository'] + "\n")
 
                 lst_users = ["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']]
