@@ -1,8 +1,6 @@
 import os.path
-import datetime
 from dateutil import parser, relativedelta
 from .Platform import Platform
-from pprint import pprint
 
 
 class ReadtheDocs(Platform):
@@ -73,7 +71,6 @@ class ReadtheDocs(Platform):
         dict_projects["content"] = list()
 
         projects = self._get_json_from_url(url=url_projects, token=self.api_key)
-        #pprint (projects)
 
         dict_projects["meta"]["project_count"] = projects["count"]
 
@@ -132,17 +129,11 @@ class ReadtheDocs(Platform):
                 md_file.write("**Created:** " + created + "\n")
                 md_file.write("**Last modified:** " + last_modified + "\n")
                 md_file.write("**Last built:** " + item['last_build'] +
-                              f"<span style=\"color: {build_color}; font-weight: bold\"> [" + item["last_build_status"] + "]</span>" + "\n")
+                              f" <span style=\"color: {build_color}; font-weight: bold\"> " +
+                              "[" + item["last_build_status"] + "] </span>" + "\n")
                 md_file.write("**Repository:** " + item['repository'] + "\n")
 
                 lst_users = ["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']]
 
                 md_file.write("**Users:** " + ", ".join(lst_users) + "\n")
                 md_file.write("\n")
-                #md_file.write("---\n")
-
-
-
-        # Needs to return to main, as main is writing the index
-
-
