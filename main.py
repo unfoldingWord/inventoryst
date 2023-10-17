@@ -11,8 +11,12 @@ class Inventoryst:
     def inventorize(self):
 
         # ReadTheDocs
-        obj_rtd = ReadtheDocs()
-        obj_rtd.inventorize()
+        #obj_rtd = ReadtheDocs()
+        #obj_rtd.inventorize()
+
+        # Netlify
+        obj_nlf = Netlify()
+        obj_nlf.inventorize()
 
 
 obj_inventoryst = Inventoryst()
