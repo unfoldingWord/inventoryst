@@ -57,8 +57,10 @@ class Platform:
             raise FileExistsError(f"The directory '{base_path}' does not exist. Exiting.")
 
         for page in inventory:
-            print(page)
-            # We need to do magic stuff with paths and files here
+            # Create path if it does not exist
+            path = "/".join(page.split('/')[:-1])
+            if not os.path.exists(base_path + "/" + path):
+                os.makedirs(base_path + "/" + path)
 
             with open(base_path + "/" + page, 'w') as md_file:
                 # Last updated
