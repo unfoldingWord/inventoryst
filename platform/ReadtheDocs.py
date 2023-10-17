@@ -9,16 +9,10 @@ class ReadtheDocs(Platform):
         self.api_url = self._get_env('READTHEDOCS_API_URL')
         self.api_key = self._get_env('READTHEDOCS_API_KEY')
 
-    def inventorize(self):
-        inventory = self.__enumerate()
-        self.__export_to_markdown_files(inventory)
-
-        # @TODO something needs to be returned to caller, so the index.md can be built
-
     def __get_build_details(self, slug):
         url_builds = self.api_url + f"/projects/{slug}/builds/"
 
-        dict_builds = self._get_json_from_url(url=url_builds, token=self.api_key)
+        dict_builds = self._get_json_from_url(url=url_builds, authorization='Token ' + self.api_key)
 
         # RtD returns builds in reverse order of build dates. So last build comes first!
         last_build = dict_builds['results'][0]
@@ -70,7 +64,7 @@ class ReadtheDocs(Platform):
         dict_projects["meta"] = dict()
         dict_projects["content"] = list()
 
-        projects = self._get_json_from_url(url=url_projects, token=self.api_key)
+        projects = self._get_json_from_url(url=url_projects, authorization='Token ' + self.api_key)
 
         dict_projects["meta"]["project_count"] = projects["count"]
 
@@ -101,39 +95,42 @@ class ReadtheDocs(Platform):
 
         return dict_projects
 
-    def __export_to_markdown_files(self, inventory):
+    def _build_content(self):
+        inventory = self.__enumerate()
+        return self.__to_markdown(inventory)
+
+    def __to_markdown(self, inventory):
         # pprint(inventory)
 
-        base_path = self._get_output_dir()
+        lst_content = list()
+
+        # General information
+        lst_content.append(">[!info] General information")
+        lst_content.append(">**Overview:** [dashboard](https://readthedocs.org/dashboard)")
+        lst_content.append("**Number of projects:** " + str(inventory["meta"]["project_count"]))
+        lst_content.append("")
+
+        # List the projects
+        for item in inventory["content"]:
+            created = parser.parse(item['created']).strftime("%B %-d, %Y")
+            last_modified = parser.parse(item['last_modified']).strftime("%B %-d, %Y")
+
+            build_color = "green" if item["last_build_status"] == 'success' else "red"
+
+            lst_content.append("### [" + item['name'] + "](" + item['home'] + ")")
+            lst_content.append("**Created:** " + created)
+            lst_content.append("**Last modified:** " + last_modified)
+            lst_content.append("**Last built:** " + item['last_build'] +
+                          f" <span style=\"color: {build_color}; font-weight: bold\"> " +
+                          "[" + item["last_build_status"] + "] </span>")
+            lst_content.append("**Repository:** " + item['repository'])
+
+            lst_users = ["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']]
+
+            lst_content.append("**Users:** " + ", ".join(lst_users))
+            lst_content.append("")
+
+        # return it all
         platform_file = self._get_env('READTHEDOCS_MD_FILE')
 
-        if not os.path.exists(base_path):
-            raise FileExistsError(f"The directory '{base_path}' does not exist. Exiting.")
-
-        with open(base_path + "/" + platform_file, 'w') as md_file:
-            md_file.write(self._get_header_warning() + "\n")
-
-            # General information
-            md_file.write(">[!info] General information\n")
-            md_file.write(">**Overview:** [dashboard](https://readthedocs.org/dashboard)\n")
-            md_file.write("**Number of projects:** " + str(inventory["meta"]["project_count"]) + "\n\n")
-
-            # List the projects
-            for item in inventory["content"]:
-                created = parser.parse(item['created']).strftime("%B %-d, %Y")
-                last_modified = parser.parse(item['last_modified']).strftime("%B %-d, %Y")
-
-                build_color = "green" if item["last_build_status"] == 'success' else "red"
-
-                md_file.write("### [" + item['name'] + "](" + item['home'] + ")\n")
-                md_file.write("**Created:** " + created + "\n")
-                md_file.write("**Last modified:** " + last_modified + "\n")
-                md_file.write("**Last built:** " + item['last_build'] +
-                              f" <span style=\"color: {build_color}; font-weight: bold\"> " +
-                              "[" + item["last_build_status"] + "] </span>" + "\n")
-                md_file.write("**Repository:** " + item['repository'] + "\n")
-
-                lst_users = ["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']]
-
-                md_file.write("**Users:** " + ", ".join(lst_users) + "\n")
-                md_file.write("\n")
+        return {platform_file: lst_content}

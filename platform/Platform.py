@@ -7,14 +7,14 @@ class Platform:
     def __init__(self):
         self._now = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    def _get_json_from_url(self, url, token):
+    def _get_json_from_url(self, url, authorization):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
         }
 
-        if token:
-            req_headers['Authorization'] = 'Token ' + token
+        if authorization:
+            req_headers['Authorization'] = authorization
             raw = requests.get(url, headers=req_headers)
         # elif auth:
         #     req_headers['Authorization'] = auth
@@ -49,3 +49,31 @@ class Platform:
                        )
 
         return str_message
+
+    def __export_to_markdown_files(self, inventory):
+        base_path = self._get_output_dir()
+
+        if not os.path.exists(base_path):
+            raise FileExistsError(f"The directory '{base_path}' does not exist. Exiting.")
+
+        for page in inventory:
+            print(page)
+            # We need to do magic stuff with paths and files here
+
+            with open(base_path + "/" + page, 'w') as md_file:
+                # Last updated
+                str_date = datetime.datetime.utcnow().strftime("%B %d %Y, %I:%M %p")
+                md_file.write("*Last updated: " + str_date + "*\n")
+
+                # Add generic warning
+                md_file.write(self._get_header_warning() + "\n")
+
+                str_content = "\n".join(inventory[page])
+                md_file.write(str_content)
+
+    def _build_content(self):
+        raise NotImplementedError("You must override _build_content in your child class")
+
+    def inventorize(self):
+        inventory = self._build_content()
+        self.__export_to_markdown_files(inventory)
