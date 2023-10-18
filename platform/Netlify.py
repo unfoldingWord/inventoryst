@@ -1,6 +1,6 @@
 from .Platform import Platform
+from dateutil import parser
 from pprint import pprint
-
 
 class Netlify(Platform):
     def __init__(self):
@@ -66,6 +66,17 @@ class Netlify(Platform):
         file = "netlify/members.md"
         return {file: lst_content}
 
+    def __get_env_vars_for_site(self, site_id):
+        url_env_vars = self.api_url + f'/accounts/{self.team}/env?site_id={site_id}'
+        lst_env_vars = self._get_json_from_url(url=url_env_vars, authorization='Bearer ' + self.api_key)
+
+        lst_return = list()
+        if len(lst_env_vars) > 0:
+            for item in lst_env_vars:
+                lst_return.append(item["key"])
+
+        return lst_return
+
     def __enumerate_sites(self):
         dict_sites = dict()
         dict_sites["meta"] = dict()
@@ -86,8 +97,17 @@ class Netlify(Platform):
             dict_site['url'] = site['ssl_url']
             if len(site['build_settings']) > 0:
                 dict_site['repository'] = site['build_settings']['repo_url']
-                dict_site['updated'] = site['build_settings']['updated_at']
 
+                str_date = parser.parse(site['build_settings']['updated_at']).strftime("%a, %b %-d, %Y, %-I:%M %p")
+                dict_site['updated'] = str_date
+
+            dict_site['uses_new_env_var'] = site["uses_new_env_var"]
+            if site["uses_new_env_var"] is True:
+                dict_site['env_vars'] = ", ".join(self.__get_env_vars_for_site(site['site_id']))
+            else:
+                dict_site['env_vars'] = ""
+
+            # Wrap up
             dict_sites["content"].append(dict_site)
 
         return dict_sites
@@ -106,13 +126,18 @@ class Netlify(Platform):
 
         for site in sites_sorted:
 
-            lst_content.append(f"### {site['name']}")
-            lst_content.append(f"**Domain:** {site['domain']}")
-            lst_content.append(f"**ID:** {site['id']}")
+            lst_content.append(f"### [{site['name']}]({site['url']})")
+            lst_content.append(f"**Netlify domain:** {site['domain']}")
             if 'repository' in site:
                 lst_content.append(f"**Repository:** {site['repository']}")
                 lst_content.append(f"**Updated:** {site['updated']}")
-            lst_content.append(f"**URL:** {site['url']}")
+            lst_content.append(f"**ID:** {site['id']}")
+
+            if site["env_vars"]:
+                lst_content.append(f"**Env vars:** {site['env_vars']}")
+            else:
+                lst_content.append(f"**Env vars:** <span style=\"color: grey\">none</span>")
+
             lst_content.append("")
 
         file = "netlify/sites.md"
