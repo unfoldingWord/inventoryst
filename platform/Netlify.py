@@ -2,6 +2,7 @@ from .Platform import Platform
 from dateutil import parser
 from pprint import pprint
 
+
 class Netlify(Platform):
     def __init__(self):
         super().__init__()
@@ -33,6 +34,8 @@ class Netlify(Platform):
 
             dict_users["content"].append(dict_user)
 
+        # Sort users alphabetically and return
+        dict_users['content'] = sorted(dict_users["content"], key=lambda item: item["name"].lower())
         return dict_users
 
     def __users_to_markdown(self, inventory):
@@ -75,7 +78,31 @@ class Netlify(Platform):
             for item in lst_env_vars:
                 lst_return.append(item["key"])
 
+        return sorted(lst_return)
+
+    def __get_deploys_for_site(self, site_id):
+        # Get last 5 production deploys
+        url_deploys = self.api_url + f'/sites/{site_id}/deploys?production=true&per_page=5'
+        lst_deploys = self._get_json_from_url(url=url_deploys, authorization='Bearer ' + self.api_key)
+
+        lst_deploys = sorted(lst_deploys, key=lambda item: item["created_at"], reverse=True)
+
+        lst_return = list()
+        for deploy in lst_deploys:
+            lst_return.append({
+                'created_at': deploy['created_at'],
+                'id': deploy['id'],
+                'state': deploy['state'],
+                'error_message': deploy['error_message']
+            })
+
         return lst_return
+
+    def __get_ssl_cert(self, site_id):
+        url_cert = self.api_url + f'/sites/{site_id}/ssl'
+        dict_cert = self._get_json_from_url(url=url_cert, authorization='Bearer ' + self.api_key)
+
+        return dict_cert
 
     def __enumerate_sites(self):
         dict_sites = dict()
@@ -101,11 +128,22 @@ class Netlify(Platform):
                 str_date = parser.parse(site['build_settings']['updated_at']).strftime("%a, %b %-d, %Y, %-I:%M %p")
                 dict_site['updated'] = str_date
 
+            # Environment variables
             dict_site['uses_new_env_var'] = site["uses_new_env_var"]
             if site["uses_new_env_var"] is True:
                 dict_site['env_vars'] = ", ".join(self.__get_env_vars_for_site(site['site_id']))
             else:
                 dict_site['env_vars'] = ""
+
+            # Deploys
+            lst_deploys = self.__get_deploys_for_site(site['site_id'])
+            if len(lst_deploys) > 0:
+                dict_site['deploys'] = lst_deploys
+
+            # TLS certificate
+            dict_cert = self.__get_ssl_cert(site['site_id'])
+            if dict_cert:
+                dict_site['tls_cert'] = dict_cert
 
             # Wrap up
             dict_sites["content"].append(dict_site)
@@ -126,17 +164,51 @@ class Netlify(Platform):
 
         for site in sites_sorted:
 
-            lst_content.append(f"### [{site['name']}]({site['url']})")
+            lst_content.append(f"### [{site['name']}](https://app.netlify.com/sites/{site['name']}/overview)")
+            lst_content.append(f"**URL:** {site['url']}")
             lst_content.append(f"**Netlify domain:** {site['domain']}")
             if 'repository' in site:
                 lst_content.append(f"**Repository:** {site['repository']}")
                 lst_content.append(f"**Updated:** {site['updated']}")
             lst_content.append(f"**ID:** {site['id']}")
 
+            # Environment variables
             if site["env_vars"]:
                 lst_content.append(f"**Env vars:** {site['env_vars']}")
             else:
                 lst_content.append(f"**Env vars:** <span style=\"color: grey\">none</span>")
+
+            # Deploys
+            if "deploys" in site:
+                lst_content.append(f"**Production deploys:**")
+
+                for deploy in site['deploys']:
+                    if deploy['state'] == 'ready':
+                        state = "<span style=\"font-weight: bold; color: green\">[ Published ]</span>"
+                    elif deploy['state'] == 'error':
+                        if deploy['error_message'] == 'Canceled build':
+                            state = f"<span style=\"font-weight: bold; color: grey\">[ Canceled ]</span>"
+                        else:
+                            state = f"<span style=\"font-weight: bold; color: red\">[ Error ]</span>"
+                    else:
+                        state = f"<span style=\"font-weight: bold; color: grey\">[ {deploy['state']} ]</span>"
+
+                    str_deploy_date = parser.parse(deploy['created_at']).strftime("%b %-d, %Y, at %-I:%M %p")
+
+                    deploy_url = f"https://app.netlify.com/sites/{site['name']}/deploys/{deploy['id']}"
+
+                    lst_content.append(f"  * [{str_deploy_date}]({deploy_url}) {state}")
+
+            # SSL
+            if "tls_cert" in site:
+                lst_content.append("**TLS Certificate:** ")
+
+                str_created_date = parser.parse(site['tls_cert']['created_at']).strftime("%b %-d, %Y at %-I:%M %p")
+                lst_content.append(f"  * **Created:** {str_created_date}")
+                str_updated_date = parser.parse(site['tls_cert']['updated_at']).strftime("%b %-d, %Y at %-I:%M %p")
+                lst_content.append(f"  * **Updated:** {str_updated_date}")
+                str_expires_date = parser.parse(site['tls_cert']['expires_at']).strftime("%b %-d, %Y at %-I:%M %p")
+                lst_content.append(f"  * **Expires:** {str_expires_date}")
 
             lst_content.append("")
 
