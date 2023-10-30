@@ -1,4 +1,3 @@
-import os.path
 from dateutil import parser, relativedelta
 from .Platform import Platform
 
@@ -23,6 +22,8 @@ class ReadtheDocs(Platform):
         }
 
     def __get_readable_timedelta(self, date):
+        # Currently, this function is not being used
+        # Keeping it for maybe later usage
         my_date = parser.parse(date)
 
         fancy_delta = relativedelta.relativedelta(self._now, my_date)
@@ -69,19 +70,16 @@ class ReadtheDocs(Platform):
         dict_projects["meta"]["project_count"] = projects["count"]
 
         for item in projects["results"]:
-
             # Get build details
             dict_last_build = self.__get_build_details(item['slug'])
             build_status = "success" if dict_last_build['success'] is True else "failed"
-
-            last_build = self.__get_readable_timedelta(dict_last_build["date_finished"])
 
             dict_project = dict()
             dict_project['name'] = item['name']
 
             dict_project['created'] = item['created']
             dict_project['last_modified'] = item['modified']
-            dict_project['last_build'] = last_build
+            dict_project['last_build'] = dict_last_build["date_finished"]
             dict_project['last_build_status'] = build_status
 
             dict_project['repository'] = item['repository']['url']
@@ -100,7 +98,6 @@ class ReadtheDocs(Platform):
         return self.__to_markdown(inventory)
 
     def __to_markdown(self, inventory):
-        # pprint(inventory)
 
         lst_content = list()
 
@@ -113,16 +110,17 @@ class ReadtheDocs(Platform):
         # List the projects
         for item in inventory["content"]:
             created = parser.parse(item['created']).strftime("%B %-d, %Y")
-            last_modified = parser.parse(item['last_modified']).strftime("%B %-d, %Y")
+            last_built = parser.parse(item['last_build']).strftime("%a, %b %-d, %Y, %-I:%M %p")
+            last_modified = parser.parse(item['last_modified']).strftime("%a, %b %-d, %Y, %-I:%M %p")
 
             build_color = "green" if item["last_build_status"] == 'success' else "red"
 
             lst_content.append("### [" + item['name'] + "](" + item['home'] + ")")
             lst_content.append("**Created:** " + created)
             lst_content.append("**Last modified:** " + last_modified)
-            lst_content.append("**Last built:** " + item['last_build'] +
-                          f" <span style=\"color: {build_color}; font-weight: bold\"> " +
-                          "[" + item["last_build_status"] + "] </span>")
+            lst_content.append("**Last built:** " + last_built +
+                               f" <span style=\"color: {build_color}; font-weight: bold\"> " +
+                               "[" + item["last_build_status"] + "] </span>")
             lst_content.append("**Repository:** " + item['repository'])
 
             lst_users = ["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']]
