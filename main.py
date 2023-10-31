@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from platform import *
+from platforms import *
 import logging
 import os
 
@@ -39,6 +39,10 @@ class Inventoryst:
         # Netlify
         obj_nlf = Netlify()
         obj_nlf.inventorize()
+
+        # DNS (EPIK, Namecheap)
+        obj_dns = DNS()
+        obj_dns.inventorize()
 
 
 obj_inventoryst = Inventoryst()
