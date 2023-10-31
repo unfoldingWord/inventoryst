@@ -1,8 +1,9 @@
-import os
-import requests
 import datetime
 import hashlib
 import logging
+import os
+
+import requests
 
 
 class Platform:
@@ -13,7 +14,7 @@ class Platform:
         self._logger = logging.getLogger()
 
     @staticmethod
-    def _get_json_from_url(url, authorization):
+    def _get_json_from_url(url, authorization=None):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
@@ -81,26 +82,32 @@ class Platform:
             self._logger.debug("New hash: " + hash_new)
 
             f_path = base_path + "/" + page
-            with open(f_path, 'r') as file:
-                lst_old_content = list()
+            hash_old = ""
+            if os.path.exists(f_path):
+                with open(f_path, 'r') as file:
+                    lst_old_content = list()
 
-                # skip line with 'Last updated' statement (because it always changes)
-                next(file)
+                    # skip line with 'Last updated' statement (because it always changes)
+                    next(file)
 
-                # Get all lines and collate them together
-                for line in file:
-                    lst_old_content.append(line)
+                    # Get all lines and collate them together
+                    for line in file:
+                        lst_old_content.append(line)
 
-                old_content = "".join(lst_old_content)
+                    old_content = "".join(lst_old_content)
 
-                # Generate hash for existing content
-                hash_old = hashlib.sha256(old_content.encode()).hexdigest()
+                    # Generate hash for existing content
+                    hash_old = hashlib.sha256(old_content.encode()).hexdigest()
 
-                self._logger.debug("Old hash: " + hash_old)
-                file.close()
+                    self._logger.debug("Old hash: " + hash_old)
+                    file.close()
 
-            if not hash_old == hash_new:
-                self._logger.info(f"Page content for '{page}' changed. Updating...")
+            if os.path.exists(f_path) is False or (not hash_old == hash_new):
+                if os.path.exists(f_path) is False:
+                    self._logger.info(f"The file '{page}' has been created.")
+                else:
+                    self._logger.info(f"Page content for '{page}' changed. Updating...")
+
                 with open(base_path + "/" + page, 'w') as md_file:
                     # Last updated
                     str_date = datetime.datetime.utcnow().strftime("%B %d %Y, %I:%M %p")
