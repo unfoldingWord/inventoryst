@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY main.py .
 COPY requirements.txt .
-COPY platform ./platform
+COPY platforms ./platforms
 
 # Install requirements
 # Disable caching, to keep Docker image lean
