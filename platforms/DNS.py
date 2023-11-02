@@ -2,6 +2,8 @@ from .Platform import Platform
 import requests
 import xmltodict
 from pprint import pprint
+import datetime
+
 
 class DNS(Platform):
     def __init__(self):
@@ -69,19 +71,20 @@ class DNS(Platform):
 
             domain['hosts'] = list()
             if domain_hosts["ApiResponse"]["@Status"] == 'OK':
-                for host in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["host"]:
-                    dict_host = dict()
-                    dict_host["host"] = host["@Name"]
-                    dict_host["type"] = host["@Type"]
-                    dict_host["target"] = host["@Address"]
-                    dict_host["ttl"] = host["@TTL"]
+                if 'host' in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]:
+                    for host in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["host"]:
+                        dict_host = dict()
+                        dict_host["host"] = host["@Name"]
+                        dict_host["type"] = host["@Type"]
+                        dict_host["target"] = host["@Address"]
+                        dict_host["ttl"] = host["@TTL"]
 
-                    if host["@Address"] == 'parkingpage.namecheap.com.':
-                        domain_parked = True
-                    elif host["@Name"] == 'www' and host["@Type"] == "URL" and host["@Address"].find("http") > 0:
-                        domain_forwarded = True
+                        if host["@Address"] == 'parkingpage.namecheap.com.':
+                            domain_parked = True
+                        elif host["@Name"] == 'www' and host["@Type"] == "URL" and host["@Address"].find("http") != -1:
+                            domain_forwarded = True
 
-                    domain['hosts'].append(dict_host)
+                        domain['hosts'].append(dict_host)
 
             # Determine domain status
             domain['status'] = "active"
@@ -110,10 +113,20 @@ class DNS(Platform):
     def __domains_to_markdown(self, inventory):
         lst_content = list()
 
+        cnt = 0
+        parked_domains = len([domain for domain in inventory['content'] if domain['status'] == 'parked'])
+        active_domains = len([domain for domain in inventory['content'] if domain['status'] == 'active'])
+        forwarded_domains = len([domain for domain in inventory['content'] if domain['status'] == 'forwarded'])
+        undeveloped_domains = len([domain for domain in inventory['content'] if domain['status'] == 'undeveloped'])
+
         lst_content.append(">[!info] General information")
         lst_content.append(f">**Epik:** https://registrar.epik.com/domain/portfolio")
         lst_content.append(f">**Namecheap:** https://ap.www.namecheap.com/domains/list/")
-        lst_content.append("**Number of domains:** " + str(inventory["meta"]["domain_count"]))
+        lst_content.append(">**Number of domains:** " + str(inventory["meta"]["domain_count"]))
+        lst_content.append(f">- **Active**: {active_domains}")
+        lst_content.append(f">- **Undeveloped**: {undeveloped_domains}")
+        lst_content.append(f">- **Parked**: {parked_domains}")
+        lst_content.append(f">- **Forwarded**: {forwarded_domains}")
         lst_content.append("")
 
         # Sort alphabetically on the name
@@ -121,6 +134,58 @@ class DNS(Platform):
 
         for domain in domains_sorted:
             lst_content.append(f"### {domain['name']}")
+
+            # Status
+            status_color = "black"
+            match domain['status']:
+                case 'active':
+                    status_color = "green"
+                case 'undeveloped':
+                    status_color = "grey"
+                case 'parked':
+                    status_color = "blue"
+                case 'forwarded':
+                    status_color = "orange"
+
+            str_status = f"<span style=\"font-weight: bold; color: {status_color}\">[ {domain['status']} ]</span>"
+            lst_content.append(f"**Status:** {str_status}")
+
+            lst_content.append(f"**Registrar:** {domain['registrar']}")
+
+            # Registration date
+            reg_date = datetime.datetime.strptime(domain['registration_date'], "%m/%d/%Y").strftime("%a, %b %-d, %Y")
+            lst_content.append(f"**Registration date:** {reg_date}")
+
+            # Expiry date
+            exp_date = datetime.datetime.strptime(domain['expiration_date'], "%m/%d/%Y")
+            date_diff = exp_date - datetime.datetime.now()
+            exp_date_color = "red" if date_diff.days <= 7 else ""
+            str_exp_date = exp_date.strftime("%a, %b %-d, %Y")
+            lst_content.append(f"**Expiration date:** <span style=\"color: {exp_date_color}\">{str_exp_date}</span>")
+
+            # Auto-renew
+            renew_color = 'green' if domain['auto_renew'] is True else 'red'
+            renew_status = 'yes' if domain['auto_renew'] is True else 'no'
+            str_renew = f"<span style=\"font-weight: bold; color: {renew_color}\">{renew_status}</span>"
+            lst_content.append(f"**Auto renew:** {str_renew}")
+
+            # Nameservers
+            if 'nameservers' in domain:
+                ns = "`" + "`,`".join(domain['nameservers']) + "`"
+                lst_content.append(f"**Nameservers:** {ns}")
+
+            # Hosts
+            if 'hosts' in domain and len(domain['hosts']) > 0:
+                lst_content.append("")
+                lst_content.append("| Host | Type | Target | TTL |")
+                lst_content.append("| --- | --- | --- | --- |")
+                for host in domain["hosts"]:
+                    lst_content.append(f" | {host['host']} | {host['type']} | {host['target']} | {host['ttl']} |")
+
+            lst_content.append("")
+
+            #pprint(domain)
+
 
         file = "dns.md"
         return {file: lst_content}
