@@ -3,6 +3,7 @@ import requests
 import xmltodict
 from pprint import pprint
 import datetime
+import time
 
 
 class DNS(Platform):
@@ -12,6 +13,7 @@ class DNS(Platform):
         # Namecheap
         self.namecheap_api_key = self._get_env('NAMECHEAP_API_KEY')
         self.namecheap_api_user = self._get_env('NAMECHEAP_API_USER')
+        self.__namecheap_api_counter = 0
 
         # Epik
         self.epik_api_key = self._get_env('EPIK_API_KEY')
@@ -33,13 +35,22 @@ class DNS(Platform):
 
         dict_results = self.__get_json_from_xml(namecheap_api_url)
 
+        # If we hit the API rate limit (50/min, 700/hour, and 8000/day across the whole key), wait 1 minute, then retry
+        # https://www.namecheap.com/support/knowledgebase/article.aspx/9739/63/api-faq/#z
+        while (dict_results["ApiResponse"]["@Status"] == "ERROR" and
+               dict_results["ApiResponse"]["Errors"]["Error"]["#text"] == 'Too many requests'):
+            self._logger.info(f"Namecheap API rate limit hit ({self.__namecheap_api_counter} calls). "
+                              f"Waiting (1m) and retrying...")
+
+            time.sleep(60)
+            dict_results = self.__get_json_from_xml(namecheap_api_url)
+
+        # indicates succesful call
+        self.__namecheap_api_counter += 1
+
         return dict_results
 
-    def __enumerate_domains(self):
-        dict_return = dict()
-        dict_return["meta"] = dict()
-        dict_return["content"] = dict()
-
+    def __enumerate_namecheap_domains(self):
         lst_domains = list()
 
         # NameCheap
@@ -48,8 +59,6 @@ class DNS(Platform):
         domains = dict_domains["ApiResponse"]["CommandResponse"]["DomainGetListResult"]["Domain"]
 
         for item in domains:
-            domain_parked = False
-            domain_forwarded = False
 
             domain = dict()
             domain['name'] = item["@Name"]
@@ -64,15 +73,26 @@ class DNS(Platform):
             # get DNS servers
             domain_dns = self.__get_namecheap_data(command="domains.dns.getlist", query_params=f"SLD={sld}&TLD={tld}")
             if domain_dns["ApiResponse"]["@Status"] == 'OK':
-                domain['nameservers'] = domain_dns["ApiResponse"]["CommandResponse"]["DomainDNSGetListResult"]["Nameserver"]
+                domain['nameservers'] = domain_dns["ApiResponse"]["CommandResponse"]["DomainDNSGetListResult"][
+                    "Nameserver"]
 
             # get configured hosts
-            domain_hosts = self.__get_namecheap_data(command="domains.dns.gethosts", query_params=f"SLD={sld}&TLD={tld}")
+            domain_hosts = self.__get_namecheap_data(command="domains.dns.gethosts",
+                                                     query_params=f"SLD={sld}&TLD={tld}")
 
             domain['hosts'] = list()
+            domain['custom_dns'] = False
+            domain_parked = False
             if domain_hosts["ApiResponse"]["@Status"] == 'OK':
                 if 'host' in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]:
                     for host in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["host"]:
+                        # Sometimes the API gives weird data back...
+                        if not type(host) == dict:
+                            str_host = str(host)
+                            self._logger.warning(
+                                f"Unexpected value for host in domain '{domain['name']}': {str_host} ({type(host)})")
+                            continue
+
                         dict_host = dict()
                         dict_host["host"] = host["@Name"]
                         dict_host["type"] = host["@Type"]
@@ -81,28 +101,47 @@ class DNS(Platform):
 
                         if host["@Address"] == 'parkingpage.namecheap.com.':
                             domain_parked = True
-                        elif host["@Name"] == 'www' and host["@Type"] == "URL" and host["@Address"].find("http") != -1:
-                            domain_forwarded = True
 
                         domain['hosts'].append(dict_host)
+            elif domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["@IsUsingOurDNS"] == 'false':
+                # I could do fancy pancy here, with pulling hosts from other platforms (AWS?)
+                # But for now, just keep it simple
+                domain['custom_dns'] = True
+            else:
+                str_error = str(domain_hosts)
+                self._logger.warning(f"Unexpected host data returned for domain '{domain['name']}': {str_error}")
 
             # Determine domain status
             domain['status'] = "active"
-            if len(domain['hosts']) == 0:
-                domain['status'] = 'undeveloped'
+            if 'hosts' in domain and len(domain['hosts']) == 0:
+                if domain['custom_dns'] is False:
+                    domain['status'] = 'undeveloped'
             elif domain_parked is True:
                 domain['status'] = "parked"
-            elif domain_forwarded is True:
-                domain['status'] = "forwarded"
 
             # Finally, add to lst_domains
             lst_domains.append(domain)
 
-        # Epik
-        #lst_domains = self._get_json_from_url(self.epik_api_url)['data']
+        return lst_domains
 
-        #print(len(lst_domains))
-        #for item in lst_domains:
+    def __enumerate_epik_domains(self):
+        pass
+
+    def __enumerate_domains(self):
+        dict_return = dict()
+        dict_return["meta"] = dict()
+        dict_return["content"] = dict()
+
+        lst_domains = list()
+
+        lst_namecheap_domains = self.__enumerate_namecheap_domains()
+        lst_domains += lst_namecheap_domains
+
+        # Epik
+        # lst_domains = self._get_json_from_url(self.epik_api_url)['data']
+
+        # print(len(lst_domains))
+        # for item in lst_domains:
         #    print(item["domain"].lower())
 
         dict_return["meta"]["domain_count"] = len(lst_domains)
@@ -113,10 +152,8 @@ class DNS(Platform):
     def __domains_to_markdown(self, inventory):
         lst_content = list()
 
-        cnt = 0
         parked_domains = len([domain for domain in inventory['content'] if domain['status'] == 'parked'])
         active_domains = len([domain for domain in inventory['content'] if domain['status'] == 'active'])
-        forwarded_domains = len([domain for domain in inventory['content'] if domain['status'] == 'forwarded'])
         undeveloped_domains = len([domain for domain in inventory['content'] if domain['status'] == 'undeveloped'])
 
         lst_content.append(">[!info] General information")
@@ -126,7 +163,6 @@ class DNS(Platform):
         lst_content.append(f">- **Active**: {active_domains}")
         lst_content.append(f">- **Undeveloped**: {undeveloped_domains}")
         lst_content.append(f">- **Parked**: {parked_domains}")
-        lst_content.append(f">- **Forwarded**: {forwarded_domains}")
         lst_content.append("")
 
         # Sort alphabetically on the name
@@ -144,8 +180,6 @@ class DNS(Platform):
                     status_color = "grey"
                 case 'parked':
                     status_color = "blue"
-                case 'forwarded':
-                    status_color = "orange"
 
             str_status = f"<span style=\"font-weight: bold; color: {status_color}\">[ {domain['status']} ]</span>"
             lst_content.append(f"**Status:** {str_status}")
@@ -176,20 +210,22 @@ class DNS(Platform):
 
             # Hosts
             if 'hosts' in domain and len(domain['hosts']) > 0:
+                lst_content.append(f"**Hosts:** {len(domain['hosts'])}")
                 lst_content.append("")
                 lst_content.append("| Host | Type | Target | TTL |")
                 lst_content.append("| --- | --- | --- | --- |")
                 for host in domain["hosts"]:
-                    lst_content.append(f" | {host['host']} | {host['type']} | {host['target']} | {host['ttl']} |")
+                    if type(host) is dict:
+                        str_fields = (f" | `{host['host']}` | `{host['type']}` "
+                                      f"| `{host['target']}` | {host['ttl']} |")
+                        lst_content.append(str_fields)
+            elif domain['custom_dns'] is True:
+                lst_content.append(f"**Hosts:** _Defined outside {domain['registrar']}_")
 
             lst_content.append("")
 
-            #pprint(domain)
-
-
         file = "dns.md"
         return {file: lst_content}
-
 
     def _build_content(self):
         md_main = dict()
@@ -199,4 +235,3 @@ class DNS(Platform):
         md_main.update(self.__domains_to_markdown(inventory))
 
         return md_main
-
