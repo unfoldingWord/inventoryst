@@ -24,7 +24,7 @@ class DNS(Platform):
 
         return results
 
-    def __get_epik_data(self, command, query_params=None):
+    def __get_epik_data(self, command):
         # https://docs.userapi.epik.com/v2/
 
         epik_api_url = f"https://usersapiv2.epik.com/v2/{command}?SIGNATURE={self.epik_api_key}&per_page=100"
