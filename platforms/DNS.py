@@ -17,13 +17,21 @@ class DNS(Platform):
 
         # Epik
         self.epik_api_key = self._get_env('EPIK_API_KEY')
-        self.epik_api_url = f"https://usersapiv2.epik.com/v2/domains?SIGNATURE={self.epik_api_key}&per_page=100"
 
     def __get_json_from_xml(self, url):
         raw = requests.get(url)
         results = xmltodict.parse(raw.content)
 
         return results
+
+    def __get_epik_data(self, command, query_params=None):
+        # https://docs.userapi.epik.com/v2/
+
+        epik_api_url = f"https://usersapiv2.epik.com/v2/{command}?SIGNATURE={self.epik_api_key}&per_page=100"
+
+        dict_results = self._get_json_from_url(epik_api_url)
+
+        return dict_results
 
     def __get_namecheap_data(self, command, query_params=None):
         query_params = f"&{query_params}" if query_params else ""
@@ -57,8 +65,10 @@ class DNS(Platform):
         dict_domains = self.__get_namecheap_data("domains.getlist")
 
         domains = dict_domains["ApiResponse"]["CommandResponse"]["DomainGetListResult"]["Domain"]
+        self._logger.info(f"Number of domains: {len(domains)}")
 
         for item in domains:
+            self._logger.info(f"Collecting info for '{item['@Name']}'")
 
             domain = dict()
             domain['name'] = item["@Name"]
@@ -125,7 +135,59 @@ class DNS(Platform):
         return lst_domains
 
     def __enumerate_epik_domains(self):
-        pass
+        lst_domains = list()
+
+        domains = self.__get_epik_data('domains')['data']
+        self._logger.info(f"Number of domains: {len(domains)}")
+
+        for item in domains:
+            self._logger.info(f"Collecting info for '{item['domain'].lower()}'")
+
+            domain = dict()
+            domain["name"] = item["domain"].lower()
+            domain["registrar"] = "Epik"
+            domain["registration_date"] = datetime.datetime.strptime(item["registration_date"],
+                                                                     '%Y-%m-%d').strftime('%m/%d/%Y')
+            domain["expiration_date"] = datetime.datetime.strptime(item["expiration_date"],
+                                                                   '%Y-%m-%d').strftime('%m/%d/%Y')
+            domain["auto_renew"] = item["auto_renew"]
+            domain["nameservers"] = item["name_servers"]
+
+            # Other DNS host
+            domain['custom_dns'] = False
+            ns_epik = len([server for server in domain['nameservers'] if not server.lower().find('epik.com') == -1])
+            if bool(ns_epik) is False:
+                domain['custom_dns'] = True
+
+            # Get the hosts
+            domain['hosts'] = list()
+            domain_parked = False
+
+            hosts = self.__get_epik_data(f"domains/{item['domain']}/records")['data']['records']
+            for host in hosts:
+                dict_host = dict()
+                dict_host['host'] = host['name']
+                dict_host['type'] = host['type']
+                dict_host['target'] = host['data']
+                dict_host['ttl'] = host['ttl']
+
+                if host['type'] == 'A' and host['data'] == '185.83.214.222':
+                    domain_parked = True
+
+                domain['hosts'].append(dict_host)
+
+            # Determine domain status
+            domain['status'] = "active"
+            if 'hosts' in domain and len(domain['hosts']) == 0:
+                if domain['custom_dns'] is False:
+                    domain['status'] = 'undeveloped'
+            elif domain_parked is True:
+                domain['status'] = "parked"
+
+            # Finally, add to lst_domains
+            lst_domains.append(domain)
+
+        return lst_domains
 
     def __enumerate_domains(self):
         dict_return = dict()
@@ -134,15 +196,14 @@ class DNS(Platform):
 
         lst_domains = list()
 
+        self._logger.info("Getting domain info from Namecheap")
         lst_namecheap_domains = self.__enumerate_namecheap_domains()
         lst_domains += lst_namecheap_domains
 
         # Epik
-        # lst_domains = self._get_json_from_url(self.epik_api_url)['data']
-
-        # print(len(lst_domains))
-        # for item in lst_domains:
-        #    print(item["domain"].lower())
+        self._logger.info("Getting domain info from Epik")
+        lst_epik_domains = self.__enumerate_epik_domains()
+        lst_domains += lst_epik_domains
 
         dict_return["meta"]["domain_count"] = len(lst_domains)
         dict_return["content"] = lst_domains
@@ -152,17 +213,29 @@ class DNS(Platform):
     def __domains_to_markdown(self, inventory):
         lst_content = list()
 
-        parked_domains = len([domain for domain in inventory['content'] if domain['status'] == 'parked'])
-        active_domains = len([domain for domain in inventory['content'] if domain['status'] == 'active'])
-        undeveloped_domains = len([domain for domain in inventory['content'] if domain['status'] == 'undeveloped'])
+        # Stats for Namecheap
+        domains_nc = [domain for domain in inventory['content'] if domain['registrar'] == 'Namecheap']
+        parked_domains_nc = len([domain for domain in domains_nc if domain['status'] == 'parked'])
+        active_domains_nc = len([domain for domain in domains_nc if domain['status'] == 'active'])
+        undeveloped_domains_nc = len([domain for domain in domains_nc if domain['status'] == 'undeveloped'])
+
+        # Stats for Epik
+        domains_epik = [domain for domain in inventory['content'] if domain['registrar'] == 'Epik']
+        parked_domains_epik = len([domain for domain in domains_epik if domain['status'] == 'parked'])
+        active_domains_epik = len([domain for domain in domains_epik if domain['status'] == 'active'])
+        undeveloped_domains_epik = len([domain for domain in domains_epik if domain['status'] == 'undeveloped'])
 
         lst_content.append(">[!info] General information")
-        lst_content.append(f">**Epik:** https://registrar.epik.com/domain/portfolio")
-        lst_content.append(f">**Namecheap:** https://ap.www.namecheap.com/domains/list/")
-        lst_content.append(">**Number of domains:** " + str(inventory["meta"]["domain_count"]))
-        lst_content.append(f">- **Active**: {active_domains}")
-        lst_content.append(f">- **Undeveloped**: {undeveloped_domains}")
-        lst_content.append(f">- **Parked**: {parked_domains}")
+        lst_content.append(f">**Number of domains:** {inventory['meta']['domain_count']}")
+        lst_content.append(f">**[Epik domains](https://registrar.epik.com/domain/portfolio):** {len(domains_epik)}")
+        lst_content.append(f">- **Active**: {active_domains_epik}")
+        lst_content.append(f">- **Undeveloped**: {undeveloped_domains_epik}")
+        lst_content.append(f">- **Parked**: {parked_domains_epik}")
+        lst_content.append(">")
+        lst_content.append(f">**[Namecheap domains](https://ap.www.namecheap.com/domains/list/):** {len(domains_nc)}")
+        lst_content.append(f">- **Active**: {active_domains_nc}")
+        lst_content.append(f">- **Undeveloped**: {undeveloped_domains_nc}")
+        lst_content.append(f">- **Parked**: {parked_domains_nc}")
         lst_content.append("")
 
         # Sort alphabetically on the name
@@ -172,7 +245,7 @@ class DNS(Platform):
             lst_content.append(f"### {domain['name']}")
 
             # Status
-            status_color = "black"
+            status_color = ""
             match domain['status']:
                 case 'active':
                     status_color = "green"
