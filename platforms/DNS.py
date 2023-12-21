@@ -97,7 +97,7 @@ class DNS(Platform):
                 if 'host' in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]:
                     for host in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["host"]:
                         # Sometimes the API gives weird data back...
-                        if not type(host) == dict:
+                        if not type(host) is dict:
                             str_host = str(host)
                             self._logger.warning(
                                 f"Unexpected value for host in domain '{domain['name']}': {str_host} ({type(host)})")
