@@ -44,6 +44,10 @@ class Inventoryst:
         obj_dns = DNS()
         obj_dns.inventorize()
 
+        # MySQL
+        obj_mysql = MySQL()
+        obj_mysql.inventorize()
+
 
 obj_inventoryst = Inventoryst()
 obj_inventoryst.inventorize()
