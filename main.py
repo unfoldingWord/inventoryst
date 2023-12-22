@@ -31,22 +31,27 @@ class Inventoryst:
         return this_logger
 
     def inventorize(self):
+        inventories_to_fetch = os.getenv('FETCH_INVENTORIES')
 
         # ReadTheDocs
-        obj_rtd = ReadtheDocs()
-        obj_rtd.inventorize()
+        if 'readthedocs' in inventories_to_fetch:
+            obj_rtd = ReadtheDocs()
+            obj_rtd.inventorize()
 
         # Netlify
-        obj_nlf = Netlify()
-        obj_nlf.inventorize()
+        if 'netlify' in inventories_to_fetch:
+            obj_nlf = Netlify()
+            obj_nlf.inventorize()
 
         # DNS (EPIK, Namecheap)
-        obj_dns = DNS()
-        obj_dns.inventorize()
+        if 'dns' in inventories_to_fetch:
+            obj_dns = DNS()
+            obj_dns.inventorize()
 
         # MySQL
-        obj_mysql = MySQL()
-        obj_mysql.inventorize()
+        if 'mysql' in inventories_to_fetch:
+            obj_mysql = MySQL()
+            obj_mysql.inventorize()
 
 
 obj_inventoryst = Inventoryst()
