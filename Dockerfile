@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Run as non-root user
 ARG user_id=3045
 RUN addgroup -g ${user_id} -S inventoryst && adduser -u ${user_id} -S -G inventoryst inventoryst
+RUN chown -R inventoryst:inventoryst ./aws-ssl-certs
 USER inventoryst
 
 CMD [ "python", "/app/main.py" ]
