@@ -46,7 +46,7 @@ class Platform:
 
         return env_value
 
-    def _get_header_warning(self):
+    def __get_header_warning(self):
         str_message = (">[!warning] Important notice: this page is automatically generated\n"
                        ">Please be aware that this page is automatically generated and maintained by "
                        "[Inventoryst](https://www.github.com/unfoldingword/inventoryst). "
@@ -73,7 +73,7 @@ class Platform:
 
             # Prep page content
             lst_page_content = list()
-            lst_page_content.append(self._get_header_warning() + "\n")
+            lst_page_content.append(self.__get_header_warning() + "\n")
             lst_page_content.append("\n".join(inventory[page]))
             new_content = "".join(lst_page_content)
 
