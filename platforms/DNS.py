@@ -10,6 +10,9 @@ class DNS(Platform):
     def __init__(self):
         super().__init__()
 
+        # Page alias
+        self._add_page_property('aliases', ['Domain List'])
+
         # Namecheap
         self.namecheap_api_key = self._get_env('NAMECHEAP_API_KEY')
         self.namecheap_api_user = self._get_env('NAMECHEAP_API_USER')
@@ -31,6 +34,8 @@ class DNS(Platform):
 
         dict_results = self._get_json_from_url(epik_api_url)
 
+        self._logger.debug(dict_results)
+
         return dict_results
 
     def __get_namecheap_data(self, command, query_params=None):
@@ -41,7 +46,11 @@ class DNS(Platform):
                              f"Command=namecheap.{command}&ClientIp=77.160.30.156&PageSize=100&"
                              f"SortBy=NAME{query_params}")
 
+        self._logger.debug(namecheap_api_url)
+
         dict_results = self.__get_json_from_xml(namecheap_api_url)
+
+        #self._logger.debug(dict_results)
 
         # If we hit the API rate limit (50/min, 700/hour, and 8000/day across the whole key), wait 1 minute, then retry
         # https://www.namecheap.com/support/knowledgebase/article.aspx/9739/63/api-faq/#z
@@ -66,6 +75,10 @@ class DNS(Platform):
 
         domains = dict_domains["ApiResponse"]["CommandResponse"]["DomainGetListResult"]["Domain"]
         self._logger.info(f"Number of domains: {len(domains)}")
+
+        # Just 5 domains is enough for local debugging
+        if self._get_env('STAGE') == 'dev':
+            domains = domains[0:5]
 
         for item in domains:
             self._logger.info(f"Collecting info for '{item['@Name']}'")
@@ -139,6 +152,10 @@ class DNS(Platform):
 
         domains = self.__get_epik_data('domains')['data']
         self._logger.info(f"Number of domains: {len(domains)}")
+
+        # Just 5 domains is enough for local debugging
+        if self._get_env('STAGE') == 'dev':
+            domains = domains[0:5]
 
         for item in domains:
             self._logger.info(f"Collecting info for '{item['domain'].lower()}'")

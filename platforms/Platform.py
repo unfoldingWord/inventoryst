@@ -13,6 +13,8 @@ class Platform:
         # Init logging
         self._logger = logging.getLogger()
 
+        self.__page_properties = dict()
+
     @staticmethod
     def _get_json_from_url(url, authorization=None):
         # Basic headers
@@ -46,6 +48,28 @@ class Platform:
 
         return env_value
 
+    def _add_page_property(self, key, value):
+        self.__page_properties[key] = value
+
+    def __get_page_properties(self):
+        if len(self.__page_properties):
+            properties = ''
+            for tproperty, value in self.__page_properties.items():
+
+                if type(value) is list:
+                    value = '\n'.join(['  - ' + item for item in value])
+                    properties += tproperty + ': \n' + value + '\n'
+                else:
+                    properties += tproperty + ': ' + value + "\n"
+
+            self._logger.debug(properties.replace('\n', '/'))
+            return "---\n" + properties + "---\n"
+        else:
+            # Return empty property block.
+            # This only occurs when checking if a page is modified. When we actually write the page,
+            # it will always contain at least the 'modified' property
+            return "---\n" + "---\n"
+
     def __get_header_warning(self):
         str_message = (">[!warning] Important notice: this page is automatically generated\n"
                        ">Please be aware that this page is automatically generated and maintained by "
@@ -56,6 +80,16 @@ class Platform:
                        )
 
         return str_message
+
+    def __prep_page_content(self, main_content):
+        lst_page_content = list()
+        if self.__get_page_properties():
+            lst_page_content.append(self.__get_page_properties())
+        lst_page_content.append(self.__get_header_warning() + "\n")
+        lst_page_content.append("\n".join(main_content))
+        new_content = "".join(lst_page_content)
+
+        return new_content
 
     def __export_to_markdown_files(self, inventory):
         base_path = self._get_output_dir()
@@ -72,10 +106,7 @@ class Platform:
                 os.makedirs(base_path + "/" + path)
 
             # Prep page content
-            lst_page_content = list()
-            lst_page_content.append(self.__get_header_warning() + "\n")
-            lst_page_content.append("\n".join(inventory[page]))
-            new_content = "".join(lst_page_content)
+            new_content = self.__prep_page_content(inventory[page])
 
             # Generate hash for new content
             hash_new = hashlib.sha256(new_content.encode()).hexdigest()
@@ -87,12 +118,10 @@ class Platform:
                 with open(f_path, 'r') as file:
                     lst_old_content = list()
 
-                    # skip line with 'Last updated' statement (because it always changes)
-                    next(file)
-
                     # Get all lines and collate them together
                     for line in file:
-                        lst_old_content.append(line)
+                        if line.find('modified: ') == -1:  # Ignore 'modified' line
+                            lst_old_content.append(line)
 
                     old_content = "".join(lst_old_content)
 
@@ -110,8 +139,11 @@ class Platform:
 
                 with open(base_path + "/" + page, 'w') as md_file:
                     # Last updated
-                    str_date = datetime.datetime.utcnow().strftime("%B %d %Y, %I:%M %p")
-                    md_file.write("*Last updated: " + str_date + "*\n")
+                    self._add_page_property('modified', datetime.datetime.utcnow().strftime("%Y-%m-%d"))
+                    new_content = self.__prep_page_content(inventory[page])
+
+                    # str_date = datetime.datetime.utcnow().strftime("%B %d %Y, %I:%M %p")
+                    # md_file.write("*Last updated: " + str_date + "*\n")
 
                     md_file.write(new_content)
             else:
