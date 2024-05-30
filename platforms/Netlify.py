@@ -1,6 +1,6 @@
 from .Platform import Platform
 from dateutil import parser
-# from pprint import pprint
+from pprint import pprint
 
 
 class Netlify(Platform):
@@ -115,6 +115,8 @@ class Netlify(Platform):
         dict_sites["meta"]["site_count"] = len(lst_sites)
 
         for site in lst_sites:
+            # pprint(site)
+            # exit()
 
             dict_site = dict()
             dict_site['created'] = site['created_at']
@@ -129,11 +131,7 @@ class Netlify(Platform):
                 dict_site['updated'] = str_date
 
             # Environment variables
-            dict_site['uses_new_env_var'] = site["uses_new_env_var"]
-            if site["uses_new_env_var"] is True:
-                dict_site['env_vars'] = ", ".join(self.__get_env_vars_for_site(site['site_id']))
-            else:
-                dict_site['env_vars'] = ""
+            dict_site['env_vars'] = ", ".join(self.__get_env_vars_for_site(site['site_id']))
 
             # Deploys
             lst_deploys = self.__get_deploys_for_site(site['site_id'])
