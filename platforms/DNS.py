@@ -1,7 +1,7 @@
 from .Platform import Platform
 import requests
 import xmltodict
-from pprint import pprint
+# from pprint import pprint
 import datetime
 import time
 
@@ -50,7 +50,7 @@ class DNS(Platform):
 
         dict_results = self.__get_json_from_xml(namecheap_api_url)
 
-        #self._logger.debug(dict_results)
+        # self._logger.debug(dict_results)
 
         # If we hit the API rate limit (50/min, 700/hour, and 8000/day across the whole key), wait 1 minute, then retry
         # https://www.namecheap.com/support/knowledgebase/article.aspx/9739/63/api-faq/#z
@@ -218,9 +218,11 @@ class DNS(Platform):
         lst_domains += lst_namecheap_domains
 
         # Epik
-        self._logger.info("Getting domain info from Epik")
-        lst_epik_domains = self.__enumerate_epik_domains()
-        lst_domains += lst_epik_domains
+        # It appears that Epik API cannot be used from Europe and/or Netherlands.
+        if not self._get_env('STAGE') == 'dev':
+            self._logger.info("Getting domain info from Epik")
+            lst_epik_domains = self.__enumerate_epik_domains()
+            lst_domains += lst_epik_domains
 
         dict_return["meta"]["domain_count"] = len(lst_domains)
         dict_return["content"] = lst_domains
