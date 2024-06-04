@@ -53,6 +53,11 @@ class Inventoryst:
             obj_mysql = MySQL()
             obj_mysql.inventorize()
 
+        # Zoom
+        if 'zoom' in inventories_to_fetch:
+            obj_zoom = Zoom()
+            obj_zoom.inventorize()
+
 
 obj_inventoryst = Inventoryst()
 obj_inventoryst.inventorize()
