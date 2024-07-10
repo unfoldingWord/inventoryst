@@ -27,6 +27,7 @@ class MySQL(Platform):
 
             users = cursor.fetchall()
             for user in users:
+
                 lst_grants = self.__list_grants(user[0], user[1])
 
                 dict_users[user[0] + "@" + user[1]] = lst_grants
@@ -40,20 +41,27 @@ class MySQL(Platform):
         query_grants = f"SHOW GRANTS FOR '{user}'@'{host}'"
         self._logger.debug(query_grants)
 
-        regex_grant = r"GRANT ([A-Za-z0-9_,\s\(\)]+) ON ([\*`\.a-z0-9-_]+) TO ['a-z@%.]+\s*(WITH GRANT OPTION)?"
+        regex_grant_permissions = r"GRANT ([`%@A-Za-z0-9_,\s\(\)]+?)\s(ON|TO)"
+        regex_grant_on = r"ON ([`\*\.a-z0-9-_]+)"
+        regex_grant_options = r"(WITH GRANT OPTION)"
 
         with self.db.cursor() as cursor:
             cursor.execute(query_grants)
 
             grants = cursor.fetchall()
             for grant in grants:
-                self._logger.debug(grant)
-                permissions = re.findall(regex_grant, grant[0])[0]
-                self._logger.debug(permissions)
+                self._logger.debug(f'Grant: {str(grant)}')
+
+                grant_permissions = re.findall(regex_grant_permissions, grant[0])
+                grant_on = re.findall(regex_grant_on, grant[0])
+                grant_options = re.findall(regex_grant_options, grant[0])
+                self._logger.debug(f'Permissions: {str(grant_permissions)}')
+                self._logger.debug(f'On: {str(grant_on)}')
+                self._logger.debug(f'Options: {str(grant_options)}')
                 lst_permissions.append({
-                    "permissions": permissions[0],
-                    "target": permissions[1].replace('`', ''),
-                    "options": permissions[2]
+                    "permissions": grant_permissions[0][0],
+                    "target": grant_on[0].replace('`', '') if len(grant_on) > 0 else '',
+                    "options": grant_options[0].replace('`', '') if len(grant_options) > 0 else '',
                 })
 
         lst_permissions_sorted = sorted(lst_permissions, key=lambda item: item["target"])
