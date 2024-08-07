@@ -132,6 +132,11 @@ class Zoom(Platform):
 
         return dict_recording_stats
 
+    def __get_user(self, user_id):
+        user = self.__make_api_request(f'https://api.zoom.us/v2/users/{user_id}')
+
+        return user
+
     def __enumerate_users(self):
         dict_users = dict()
         dict_users["meta"] = dict()
@@ -166,12 +171,15 @@ class Zoom(Platform):
         rec_fetch_limit = 0
         for user in users['users']:
 
+            dict_additional_user_data = self.__get_user(user['id'])
+
             tmp_user = dict()
             tmp_user['id'] = user['id']
             tmp_user['full_name'] = user['first_name'] + ' ' + user['last_name']
             tmp_user['display_name'] = user['display_name']
             tmp_user['email'] = user['email']
             tmp_user['pmi'] = user['pmi']
+            tmp_user['personal_meeting_url'] = dict_additional_user_data['personal_meeting_url']
             if 'last_client_version' in user:
                 tmp_user['last_client_version'] = user['last_client_version']
             tmp_user['last_login'] = user['last_login_time']
@@ -241,6 +249,7 @@ class Zoom(Platform):
             lst_content.append(avatar + "**Name:** " + display_name)
 
             lst_content.append("**PMI:** " + str(dict_user['pmi']))
+            lst_content.append("**Personal meeting URL:** " + dict_user['personal_meeting_url'])
             lst_content.append("**Email:** " + dict_user['email'])
 
             last_login = date_parser.parse(dict_user['last_login']).strftime("%a, %b %-d, %Y, %-I:%M %p")
