@@ -308,7 +308,7 @@ class DNS(Platform):
                 lst_content.append("| --- | --- | --- | --- |")
                 for host in domain["hosts"]:
                     if type(host) is dict:
-                        str_fields = (f" | `{host['host']}` | `{host['type']}` "
+                        str_fields = (f"| `{host['host']}` | `{host['type']}` "
                                       f"| `{host['target']}` | {host['ttl']} |")
                         lst_content.append(str_fields)
             elif domain['custom_dns'] is True:
