@@ -16,20 +16,17 @@ class Platform:
         self.__page_properties = dict()
 
     @staticmethod
-    def _get_json_from_url(url, authorization=None):
+    def _get_json_from_url(url, headers=None):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
         }
 
-        if authorization:
-            req_headers['Authorization'] = authorization
-            raw = requests.get(url, headers=req_headers)
-        # elif auth:
-        #     req_headers['Authorization'] = auth
-        #     raw = requests.get(url, headers=req_headers)
-        else:
-            raw = requests.get(url, headers=req_headers)
+        if headers:
+            for header in headers:
+                req_headers[header[0]] = header[1]
+
+        raw = requests.get(url, headers=req_headers)
 
         return raw.json()
 

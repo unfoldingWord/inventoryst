@@ -16,7 +16,7 @@ class Netlify(Platform):
         dict_users["content"] = list()
 
         url_users = self.api_url + f'/{self.team}/members'
-        lst_users = self._get_json_from_url(url=url_users, authorization='Bearer ' + self.api_key)
+        lst_users = self._get_json_from_url(url=url_users, headers=[['Authorization', 'Bearer ' + self.api_key]])
 
         dict_users["meta"]["user_count"] = len(lst_users)
 
@@ -71,7 +71,7 @@ class Netlify(Platform):
 
     def __get_env_vars_for_site(self, site_id):
         url_env_vars = self.api_url + f'/accounts/{self.team}/env?site_id={site_id}'
-        lst_env_vars = self._get_json_from_url(url=url_env_vars, authorization='Bearer ' + self.api_key)
+        lst_env_vars = self._get_json_from_url(url=url_env_vars, headers=[['Authorization', 'Bearer ' + self.api_key]])
 
         lst_return = list()
         if len(lst_env_vars) > 0:
@@ -83,7 +83,7 @@ class Netlify(Platform):
     def __get_deploys_for_site(self, site_id):
         # Get last 5 production deploys
         url_deploys = self.api_url + f'/sites/{site_id}/deploys?production=true&per_page=5'
-        lst_deploys = self._get_json_from_url(url=url_deploys, authorization='Bearer ' + self.api_key)
+        lst_deploys = self._get_json_from_url(url=url_deploys, headers=[['Authorization', 'Bearer ' + self.api_key]])
 
         lst_deploys = sorted(lst_deploys, key=lambda item: item["created_at"], reverse=True)
 
@@ -100,7 +100,7 @@ class Netlify(Platform):
 
     def __get_ssl_cert(self, site_id):
         url_cert = self.api_url + f'/sites/{site_id}/ssl'
-        dict_cert = self._get_json_from_url(url=url_cert, authorization='Bearer ' + self.api_key)
+        dict_cert = self._get_json_from_url(url=url_cert, headers=[['Authorization', 'Bearer ' + self.api_key]])
 
         return dict_cert
 
@@ -110,7 +110,7 @@ class Netlify(Platform):
         dict_sites["content"] = list()
 
         url_sites = self.api_url + f'/{self.team}/sites'
-        lst_sites = self._get_json_from_url(url=url_sites, authorization='Bearer ' + self.api_key)
+        lst_sites = self._get_json_from_url(url=url_sites, headers=[['Authorization', 'Bearer ' + self.api_key]])
 
         dict_sites["meta"]["site_count"] = len(lst_sites)
 

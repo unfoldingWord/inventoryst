@@ -12,7 +12,7 @@ class ReadtheDocs(Platform):
     def __get_build_details(self, slug):
         url_builds = self.api_url + f"/projects/{slug}/builds/"
 
-        dict_builds = self._get_json_from_url(url=url_builds, authorization='Token ' + self.api_key)
+        dict_builds = self._get_json_from_url(url=url_builds, headers=[['Authorization', 'Token ' + self.api_key]])
 
         # RtD returns builds in reverse order of build dates. So last build comes first!
         last_build = dict_builds['results'][0]
@@ -66,7 +66,7 @@ class ReadtheDocs(Platform):
         dict_projects["meta"] = dict()
         dict_projects["content"] = list()
 
-        projects = self._get_json_from_url(url=url_projects, authorization='Token ' + self.api_key)
+        projects = self._get_json_from_url(url=url_projects, headers=[['Authorization', 'Token ' + self.api_key]])
 
         dict_projects["meta"]["project_count"] = projects["count"]
 
