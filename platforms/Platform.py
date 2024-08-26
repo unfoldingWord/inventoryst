@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import logging
 import os
+from dateutil import parser
 
 import requests
 
@@ -44,6 +45,9 @@ class Platform:
             raise RuntimeError(f"Environment variable '{key}' not available")
 
         return env_value
+
+    def _format_date(self, date):
+        return parser.parse(date).strftime("%a, %b %-d, %Y, %-I:%M %p")
 
     def _add_page_property(self, key, value):
         self.__page_properties[key] = value
