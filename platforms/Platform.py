@@ -136,7 +136,7 @@ class Platform:
                 if os.path.exists(f_path) is False:
                     self._logger.info(f"The file '{page}' has been created.")
                 else:
-                    self._logger.info(f"Page content for '{page}' changed. Updating...")
+                    self._logger.info(f"Page content for '{page}' has changed. Updating...")
 
                 with open(base_path + "/" + page, 'w') as md_file:
                     # Last updated

@@ -58,6 +58,10 @@ class Inventoryst:
             obj_zoom = Zoom()
             obj_zoom.inventorize()
 
+        if 'discourse' in inventories_to_fetch:
+            obj_discourse = Discourse()
+            obj_discourse.inventorize()
+
 
 obj_inventoryst = Inventoryst()
 obj_inventoryst.inventorize()
