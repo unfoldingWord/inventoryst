@@ -99,7 +99,7 @@ class Discourse(Platform):
         dict_return["meta"] = dict()
         dict_return["content"] = list()
 
-        lst_discourse_groups = self._get_env('DISCOURSE_GROUPS').split(',')
+        lst_discourse_groups = sorted(self._get_env('DISCOURSE_GROUPS').split(','))
 
         dict_users = dict()
 
@@ -115,7 +115,7 @@ class Discourse(Platform):
                     if dev_max_users == 0:
                         break
 
-                    dev_max_users -= 1
+                    #dev_max_users -= 1
 
                 if user['id'] not in dict_users:
                     t_user = self.__get_user(user['id'])
@@ -131,6 +131,7 @@ class Discourse(Platform):
             "user_count_active": len([user for user in dict_users.items() if user[1]['is_active'] is True]),
             "user_count_admin": len([user for user in dict_users.items() if user[1]['is_admin'] is True]),
             "user_count_moderator": len([user for user in dict_users.items() if user[1]['is_moderator'] is True]),
+            "groups_scanned": ', '.join(lst_discourse_groups)
         }
 
         # Content
@@ -146,6 +147,7 @@ class Discourse(Platform):
         lst_content.append(f">**Active users:** {dict_users['meta']['user_count_active']}")
         lst_content.append(f">**Admins:** {dict_users['meta']['user_count_admin']}")
         lst_content.append(f">**Moderators:** {dict_users['meta']['user_count_moderator']}")
+        lst_content.append(f">**Groups scanned:** {dict_users['meta']['groups_scanned']}")
         lst_content.append('')
 
         # Sort alphabetically on the name
