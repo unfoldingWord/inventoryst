@@ -4,7 +4,7 @@ import base64
 import requests
 from dateutil import parser as date_parser, relativedelta
 import datetime
-# import pprint
+import pprint
 
 # https://marketplace.zoom.us/develop/apps/
 # https://developers.zoom.us/docs/api/
@@ -23,7 +23,6 @@ class Zoom(Platform):
         zoom_api = 'https://zoom.us/oauth/token'
 
         encoded_auth = base64.b64encode((client_id + ":" + client_secret).encode('utf-8')).decode('utf-8')
-        # print(encoded_auth)
 
         dict_headers = dict()
         dict_headers['Content-Type'] = "application/x-www-form-urlencoded"
@@ -136,6 +135,26 @@ class Zoom(Platform):
         user = self.__make_api_request(f'https://api.zoom.us/v2/users/{user_id}')
 
         return user
+
+    def __enumerate_rooms(self):
+        dict_rooms = dict()
+        dict_rooms["meta"] = dict()
+        dict_rooms["content"] = list()
+
+        rooms = self.__make_api_request('https://api.zoom.us/v2/rooms')
+        pprint.pprint(rooms)
+
+        dict_rooms["meta"]["room_count"] = len(rooms['rooms'])
+
+        for room in rooms['rooms']:
+            tmp_room = dict()
+
+            tmp_room['name'] = room['name']
+            tmp_room['room_id'] = room['room_id']
+
+            dict_rooms['content'].append(tmp_room)
+
+        return dict_rooms
 
     def __enumerate_users(self):
         dict_users = dict()
