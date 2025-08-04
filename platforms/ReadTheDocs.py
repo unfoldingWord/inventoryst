@@ -3,7 +3,7 @@ from dateutil import parser, relativedelta
 from .Platform import Platform
 
 
-class ReadtheDocs(Platform):
+class ReadTheDocs(Platform):
     def __init__(self):
         super().__init__()
         self.api_url = self._get_env('READTHEDOCS_API_URL')
@@ -111,7 +111,10 @@ class ReadtheDocs(Platform):
         # List the projects
         for item in inventory["content"]:
             created = parser.parse(item['created']).strftime("%B %-d, %Y")
-            last_built = parser.parse(item['last_build']).strftime("%a, %b %-d, %Y, %-I:%M %p")
+            if item['last_build']:
+                last_built = parser.parse(item['last_build']).strftime("%a, %b %-d, %Y, %-I:%M %p")
+            else:
+                last_built = '-'
             last_modified = parser.parse(item['last_modified']).strftime("%a, %b %-d, %Y, %-I:%M %p")
 
             build_color = "green" if item["last_build_status"] == 'success' else "red"
