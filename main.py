@@ -2,13 +2,14 @@ from dotenv import load_dotenv
 from platforms import *
 import logging
 import os
+import traceback
 
 load_dotenv()
 
 
 class Inventoryst:
     def __init__(self):
-        self.init_logger()
+        self.__logger = self.init_logger()
 
     def init_logger(self):
         this_logger = logging.getLogger()
@@ -31,36 +32,27 @@ class Inventoryst:
         return this_logger
 
     def inventorize(self):
-        inventories_to_fetch = os.getenv('FETCH_INVENTORIES')
+        lst_inventories_to_fetch = os.getenv('FETCH_INVENTORIES').split(',')
 
-        # ReadTheDocs
-        if 'readthedocs' in inventories_to_fetch:
-            obj_rtd = ReadtheDocs()
-            obj_rtd.inventorize()
+        map_inventories = {
+            'readthedocs': 'ReadTheDocs', # ReadTheDocs
+            'netlify': 'Netlify',         # Netlify
+            'dns': 'DNS',                 # DNS (EPIK, Namecheap)
+            'mysql': 'MySQL',             # MySQL
+            'zoom': 'Zoom',               # Zoom
+            'discourse': 'Discourse'      # Discourse
+        }
 
-        # Netlify
-        if 'netlify' in inventories_to_fetch:
-            obj_nlf = Netlify()
-            obj_nlf.inventorize()
+        for platform in lst_inventories_to_fetch:
+            self.__logger.info(f'Processing {map_inventories[platform]}...')
 
-        # DNS (EPIK, Namecheap)
-        if 'dns' in inventories_to_fetch:
-            obj_dns = DNS()
-            obj_dns.inventorize()
-
-        # MySQL
-        if 'mysql' in inventories_to_fetch:
-            obj_mysql = MySQL()
-            obj_mysql.inventorize()
-
-        # Zoom
-        if 'zoom' in inventories_to_fetch:
-            obj_zoom = Zoom()
-            obj_zoom.inventorize()
-
-        if 'discourse' in inventories_to_fetch:
-            obj_discourse = Discourse()
-            obj_discourse.inventorize()
+            try:
+                obj_platform = eval(f"{map_inventories[platform]}()")
+                obj_platform.inventorize()
+            except Exception as e:
+                self.__logger.error(f"Processing of {map_inventories[platform]} encountered an error")
+                self.__logger.error(e)
+                traceback.print_exc()
 
 
 obj_inventoryst = Inventoryst()
