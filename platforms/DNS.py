@@ -56,7 +56,7 @@ class DNS(Platform):
         # https://www.namecheap.com/support/knowledgebase/article.aspx/9739/63/api-faq/#z
         while (dict_results["ApiResponse"]["@Status"] == "ERROR" and
                dict_results["ApiResponse"]["Errors"]["Error"]["#text"] == 'Too many requests'):
-            self._logger.info(f"Namecheap API rate limit hit ({self.__namecheap_api_counter} calls). "
+            self._logger.debug(f"Namecheap API rate limit hit ({self.__namecheap_api_counter} calls). "
                               f"Waiting (1m) and retrying...")
 
             time.sleep(60)
@@ -81,7 +81,7 @@ class DNS(Platform):
             domains = domains[0:5]
 
         for item in domains:
-            self._logger.info(f"Collecting info for '{item['@Name']}'")
+            self._logger.debug(f"Collecting info for '{item['@Name']}'")
 
             domain = dict()
             domain['name'] = item["@Name"]
