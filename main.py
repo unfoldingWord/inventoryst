@@ -43,17 +43,26 @@ class Inventoryst:
             'discourse': 'Discourse'      # Discourse
         }
 
+        # Process all requested platforms
+        processed_platforms = 0
+        page_change_count = 0
         for platform in lst_inventories_to_fetch:
             self.__logger.info(f'Processing {map_inventories[platform]}...')
 
             try:
                 obj_platform = eval(f"{map_inventories[platform]}()")
                 obj_platform.inventorize()
+                processed_platforms += 1
+                page_change_count += obj_platform.get_changed_page_count()
+
             except Exception as e:
                 self.__logger.error(f"Processing of {map_inventories[platform]} encountered an error")
                 self.__logger.error(e)
                 traceback.print_exc()
 
+        self.__logger.info(f"Platforms requested: {len(lst_inventories_to_fetch)} / "
+                           f"Platforms processed: {processed_platforms} / "
+                           f"Pages changed: {page_change_count}" )
 
 obj_inventoryst = Inventoryst()
 obj_inventoryst.inventorize()

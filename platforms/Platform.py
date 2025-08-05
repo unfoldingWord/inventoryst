@@ -16,6 +16,8 @@ class Platform:
 
         self.__page_properties = dict()
 
+        self.__pages_changed = 0
+
     @staticmethod
     def _get_json_from_url(url, headers=None):
         # Basic headers
@@ -30,6 +32,9 @@ class Platform:
         raw = requests.get(url, headers=req_headers)
 
         return raw.json()
+
+    def get_changed_page_count(self):
+        return self.__pages_changed
 
     def _get_output_dir(self):
         base_path = os.getenv('OUTPUT_DIRECTORY')
@@ -147,8 +152,11 @@ class Platform:
                     # md_file.write("*Last updated: " + str_date + "*\n")
 
                     md_file.write(new_content)
+
+                    self.__pages_changed += 1
+
             else:
-                self._logger.debug(f"No changes for page '{page}'")
+                self._logger.info(f"No changes for page '{page}'")
 
     def _build_content(self):
         raise NotImplementedError("You must override _build_content in your child class")
