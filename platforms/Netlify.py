@@ -1,5 +1,6 @@
 from .Platform import Platform
 from dateutil import parser
+from datetime import datetime
 from pprint import pprint
 
 
@@ -31,6 +32,7 @@ class Netlify(Platform):
             dict_user["role"] = user["role"]
             dict_user["site_access"] = user["site_access"]
             dict_user["pending"] = user["pending"]
+            dict_user["last_activity_date"] = user["last_activity_date"]
 
             dict_users["content"].append(dict_user)
 
@@ -50,16 +52,39 @@ class Netlify(Platform):
             lst_content.append(f"### {user['name']}")
             lst_content.append(f"**Email:** {user['email']}")
 
-            # Status
-            status = "Active" if user['pending'] is False else "Pending"
-            status_color = "green" if user['pending'] is False else "orange"
-            str_status = f"<span style=\"color: {status_color}; font-weight: bold\">[{status}]</span>"
+            # Pending
+            pending = "Yes" if user['pending'] is True else "No"
+            lst_content.append(f"**Pending:** {pending}")
+
+            # Stuff based on last activity date
+            if user['last_activity_date']:
+                # Last activity date
+                last_active_date = self._format_date(user['last_activity_date'])
+
+                # Status: Mark inactive when not logged in for a month
+                date_last_active = parser.parse(user['last_activity_date'])
+                delta = datetime.today() - date_last_active
+
+                status = "Active" if delta.days < 30 else "Inactive"
+                status_color = "green" if delta.days < 30 else "orange"
+
+                str_status = self._markup_block(f'[{status}]', status_color)
+
+            else:
+                # Last activity date
+                last_active_date = 'Unknown'
+                str_status = self._markup_block('[Unknown]', 'orange', 'bold')
+
+            lst_content.append(f"**Last active:** {last_active_date}")
 
             # 2FA
             str_2fa = ""
             if user["2fa"] is False:
-                str_2fa = "<span style=\"color: orange; font-weight: bold\">[No 2FA]</span>"
+                str_2fa = self._markup_block('[No 2FA]', 'orange')
+            else:
+                str_2fa = self._markup_block('[2FA]', 'green')
 
+            # Add status and 2FA
             lst_content.append(f"**Status:** {str_status} {str_2fa}")
 
             lst_content.append(f"**Role:** {user['role']}")
@@ -182,14 +207,14 @@ class Netlify(Platform):
 
                 for deploy in site['deploys']:
                     if deploy['state'] == 'ready':
-                        state = "<span style=\"font-weight: bold; color: green\">[ Published ]</span>"
+                        state = self._markup_block('[Published]', 'green')
                     elif deploy['state'] == 'error':
                         if deploy['error_message'] == 'Canceled build':
-                            state = f"<span style=\"font-weight: bold; color: grey\">[ Canceled ]</span>"
+                            state = self._markup_block('[Canceled]', 'grey')
                         else:
-                            state = f"<span style=\"font-weight: bold; color: red\">[ Error ]</span>"
+                            state = self._markup_block('[Error]', 'red')
                     else:
-                        state = f"<span style=\"font-weight: bold; color: grey\">[ {deploy['state']} ]</span>"
+                        state = self._markup_block(f'[{deploy['state']}]', 'grey')
 
                     str_deploy_date = parser.parse(deploy['created_at']).strftime("%b %-d, %Y, at %-I:%M %p")
 

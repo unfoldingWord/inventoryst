@@ -51,6 +51,9 @@ class Platform:
 
         return env_value
 
+    def _markup_block(self, text, color, weight='bold'):
+        return f"<span style=\"color: {color}; font-weight: {weight}\">{text}</span>"
+
     def _format_date(self, date):
         return parser.parse(date).strftime("%a, %b %-d, %Y, %-I:%M %p")
 
