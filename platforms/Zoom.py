@@ -301,9 +301,16 @@ class Zoom(Platform):
 
                     recording_size = self.__format_bytes(dict_user['recording_stats']['total_recordings_size'])
 
+                    # If size of recordings is greater than X GB, we do some markup around it!
+                    size_mark_start = ''
+                    size_mark_end = ''
+                    if int(dict_user['recording_stats']['total_recordings_size']) > (1024 * 1024 * 1024 * 5):
+                        size_mark_start = '<span style="background: red; color: white; font-weight: bold"> '
+                        size_mark_end = ' </span>'
+
                     lst_content.append("**Recordings:** " + str(dict_user['recording_stats']['total_recordings']) +
                                        " | " + recording_length +
-                                       " | " + str(round(recording_size[0], 2)) + ' ' + recording_size[1])
+                                       " | " + size_mark_start + str(round(recording_size[0], 2)) + ' ' + recording_size[1] + size_mark_end)
 
             lst_content.append("")
 
