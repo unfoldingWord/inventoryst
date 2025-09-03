@@ -1,4 +1,16 @@
-FROM python:alpine
+#FROM python:alpine
+FROM cgr.dev/chainguard/wolfi-base
+
+# Set Python version
+ARG version=3.12
+
+RUN apk update && apk add --no-cache \
+    python-${version} \
+    py${version}-pip \
+    py${version}-setuptools \
+    ca-certificates \
+    curl \
+    openssl
 
 WORKDIR /app
 
@@ -12,9 +24,9 @@ ADD https://truststore.pki.rds.amazonaws.com/us-west-2/us-west-2-bundle.pem ./aw
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run as non-root user
-ARG user_id=3045
-RUN addgroup -g ${user_id} -S inventoryst && adduser -u ${user_id} -S -G inventoryst inventoryst
-RUN chown -R inventoryst:inventoryst ./aws-ssl-certs
-USER inventoryst
+# uid and gid are 65532
+RUN chown -R nonroot:nonroot /app/
+
+USER nonroot
 
 CMD [ "python", "/app/main.py" ]
