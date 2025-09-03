@@ -8,9 +8,7 @@ RUN apk update && apk add --no-cache \
     python-${version} \
     py${version}-pip \
     py${version}-setuptools \
-    ca-certificates \
-    curl \
-    openssl
+    ca-certificates
 
 WORKDIR /app
 
