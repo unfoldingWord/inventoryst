@@ -18,8 +18,7 @@ class Platform:
 
         self.__pages_changed = 0
 
-    @staticmethod
-    def _get_json_from_url(url, headers=None):
+    def _get_json_from_url(self, url, headers=None, data=None):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
@@ -29,8 +28,12 @@ class Platform:
             for header in headers:
                 req_headers[header[0]] = header[1]
 
-        raw = requests.get(url, headers=req_headers)
+        if data is None:
+            raw = requests.get(url, headers=req_headers)
+        else:
+            raw = requests.post(url, data=data, headers=req_headers)
 
+        self._logger.debug(raw)
         return raw.json()
 
     def get_changed_page_count(self):

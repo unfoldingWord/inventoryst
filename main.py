@@ -40,7 +40,8 @@ class Inventoryst:
             'dns': 'DNS',                 # DNS (EPIK, Namecheap)
             'mysql': 'MySQL',             # MySQL
             'zoom': 'Zoom',               # Zoom
-            'discourse': 'Discourse'      # Discourse
+            'discourse': 'Discourse',     # Discourse
+            'notion': 'Notion'            # Notion
         }
 
         # Process all requested platforms
