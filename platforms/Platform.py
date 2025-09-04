@@ -3,7 +3,6 @@ import hashlib
 import logging
 import os
 from dateutil import parser
-
 import requests
 
 
@@ -31,7 +30,7 @@ class Platform:
         if data is None:
             raw = requests.get(url, headers=req_headers)
         else:
-            raw = requests.post(url, data=data, headers=req_headers)
+            raw = requests.post(url, json=data, headers=req_headers)
 
         self._logger.debug(raw)
         return raw.json()
@@ -47,6 +46,9 @@ class Platform:
 
         return base_path
 
+    def _field_filter(self, dict_input, field_filter):
+        return {k: v for k, v in dict_input.items() if k in field_filter}
+
     def _get_env(self, key):
         env_value = os.getenv(key)
         if not env_value:
@@ -54,11 +56,45 @@ class Platform:
 
         return env_value
 
-    def _markup_block(self, text, color, weight='bold'):
-        return f"<span style=\"color: {color}; font-weight: {weight}\">{text}</span>"
+    def _highlight(self, text, color, background='', weight='bold', border_color=''):
+        # Build the style
+        dict_style = {
+            'color': color,
+            'weight': weight,
+        }
+        if background:
+            dict_style['background'] = background
+        if border_color:
+            dict_style['border'] = f'1px solid {border_color}'
+
+        # Make it a string and return it
+        style="; ".join([f"{k}: {v}" for k, v in dict_style.items()])
+        return f"<span style=\"{style}\">{text}</span>"
+
+    def _item(self, name, value, prefix='', indent=0):
+        # An item is a name, followed by colon and then the value
+        return f"{prefix}{' ' * indent}**{name}:** {value}"
+
+    def _note(self, text):
+        # A note is italic
+        return f'*{text}*'
+
+    def _header(self, title, size=2):
+        return f"{('#' * size)} {title}"
 
     def _format_date(self, date):
         return parser.parse(date).strftime("%a, %b %-d, %Y, %-I:%M %p")
+
+    def _format_bytes(self, size, rounding=2):
+        # 2**10 = 1024
+        power = 2 ** 10
+        n = 0
+        power_labels = {0: '', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
+        while size > power:
+            size /= power
+            n += 1
+
+        return str(round(size, rounding)) + ' ' + power_labels[n] + 'B'
 
     def _add_page_property(self, key, value):
         self.__page_properties[key] = value

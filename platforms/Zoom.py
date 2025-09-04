@@ -221,16 +221,6 @@ class Zoom(Platform):
 
         return dict_users
 
-    def __format_bytes(self, size):
-        # 2**10 = 1024
-        power = 2 ** 10
-        n = 0
-        power_labels = {0: '', 1: 'K', 2: 'M', 3: 'G', 4: 'T'}
-        while size > power:
-            size /= power
-            n += 1
-        return size, power_labels[n] + 'B'
-
     def __users_to_markdown(self, inventory):
 
         lst_content = list()
@@ -299,18 +289,16 @@ class Zoom(Platform):
                         recording_length = (str(round(dict_user['recording_stats']['total_recordings_length'] / 60, 2))
                                             + " hours")
 
-                    recording_size = self.__format_bytes(dict_user['recording_stats']['total_recordings_size'])
+                    recording_size = self._format_bytes(dict_user['recording_stats']['total_recordings_size'])
 
                     # If size of recordings is greater than X GB, we do some markup around it!
-                    size_mark_start = ''
-                    size_mark_end = ''
+                    recording_size_display = recording_size
                     if int(dict_user['recording_stats']['total_recordings_size']) > (1024 * 1024 * 1024 * 5):
-                        size_mark_start = '<span style="background: red; color: white; font-weight: bold"> '
-                        size_mark_end = ' </span>'
+                        recording_size_display = self._highlight(recording_size, 'white', 'red')
 
                     lst_content.append("**Recordings:** " + str(dict_user['recording_stats']['total_recordings']) +
                                        " | " + recording_length +
-                                       " | " + size_mark_start + str(round(recording_size[0], 2)) + ' ' + recording_size[1] + size_mark_end)
+                                       " | " + recording_size_display)
 
             lst_content.append("")
 

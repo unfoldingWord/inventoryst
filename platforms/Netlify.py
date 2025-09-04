@@ -68,21 +68,21 @@ class Netlify(Platform):
                 status = "Active" if delta.days < 30 else "Inactive"
                 status_color = "green" if delta.days < 30 else "orange"
 
-                str_status = self._markup_block(f'[{status}]', status_color)
+                str_status = self._highlight(f'[{status}]', status_color)
 
             else:
                 # Last activity date
                 last_active_date = 'Unknown'
-                str_status = self._markup_block('[Unknown]', 'orange', 'bold')
+                str_status = self._highlight('[Unknown]', 'orange', 'bold')
 
             lst_content.append(f"**Last active:** {last_active_date}")
 
             # 2FA
             str_2fa = ""
             if user["2fa"] is False:
-                str_2fa = self._markup_block('[No 2FA]', 'orange')
+                str_2fa = self._highlight('[No 2FA]', 'orange')
             else:
-                str_2fa = self._markup_block('[2FA]', 'green')
+                str_2fa = self._highlight('[2FA]', 'green')
 
             # Add status and 2FA
             lst_content.append(f"**Status:** {str_status} {str_2fa}")
@@ -140,8 +140,6 @@ class Netlify(Platform):
         dict_sites["meta"]["site_count"] = len(lst_sites)
 
         for site in lst_sites:
-            # pprint(site)
-            # exit()
 
             dict_site = dict()
             dict_site['created'] = site['created_at']
@@ -207,14 +205,14 @@ class Netlify(Platform):
 
                 for deploy in site['deploys']:
                     if deploy['state'] == 'ready':
-                        state = self._markup_block('[Published]', 'green')
+                        state = self._highlight('[Published]', 'green')
                     elif deploy['state'] == 'error':
                         if deploy['error_message'] == 'Canceled build':
-                            state = self._markup_block('[Canceled]', 'grey')
+                            state = self._highlight('[Canceled]', 'grey')
                         else:
-                            state = self._markup_block('[Error]', 'red')
+                            state = self._highlight('[Error]', 'red')
                     else:
-                        state = self._markup_block(f'[{deploy['state']}]', 'grey')
+                        state = self._highlight(f'[{deploy['state']}]', 'grey')
 
                     str_deploy_date = parser.parse(deploy['created_at']).strftime("%b %-d, %Y, at %-I:%M %p")
 
