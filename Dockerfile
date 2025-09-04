@@ -1,4 +1,4 @@
-#FROM python:alpine
+# Based off WolfiOS
 FROM cgr.dev/chainguard/wolfi-base
 
 # Set Python version
