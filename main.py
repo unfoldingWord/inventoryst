@@ -41,7 +41,8 @@ class Inventoryst:
             'mysql': 'MySQL',             # MySQL
             'zoom': 'Zoom',               # Zoom
             'discourse': 'Discourse',     # Discourse
-            'notion': 'Notion'            # Notion
+            'notion': 'Notion',           # Notion
+            'dockerhub': 'DockerHub'      # Docker Hub
         }
 
         # Process all requested platforms
