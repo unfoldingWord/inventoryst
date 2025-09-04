@@ -74,7 +74,7 @@ class Notion(Platform):
 
                 avatar = f'<span style="{avatar_style} background: gray; font-size: 25px; padding-top: 5px; text-align: center;">{initials}</span>'
 
-            lst_content.append(f"{avatar} **{user['name']}**")
+            lst_content.append(f"{avatar}**{user['name']}**")
             lst_content.append(f"**ID:** {user['id']}")
             lst_content.append("**Type:** person")
             lst_content.append(f"**Email:** {user['person']['email']}")
