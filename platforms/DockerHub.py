@@ -151,7 +151,7 @@ class DockerHub(Platform):
           lst_content.append(self._item('Size', self._format_bytes(tag['full_size']), indent=2))
           lst_content.append(self._item('Last push', self._format_date(tag['tag_last_pushed']), indent=2))
 
-          digest = f'`{tag['digest'].split(':')[1][0:8]}`' if 'digest' in tag else '-'
+          digest = f'`{tag['digest'].split(':')[1][0:12]}`' if 'digest' in tag else '-'
           lst_content.append(self._item('Digest', digest, indent=2))
 
     file = "dockerhub/repositories.md"
