@@ -135,7 +135,11 @@ class DockerHub(Platform):
     # Repositories
     for repo in dict_repositories['content']:
       lst_content.append(self._header(repo['name']))
-      lst_content.append(self._item('Status', repo['status_description']))
+      if repo['status_description'] == 'archived':
+        status = self._highlight(repo['status_description'], color='#a9470f', background='#fff4dc')
+      else:
+        status = repo['status_description']
+      lst_content.append(self._item('Status', status))
       lst_content.append(self._item('Description', repo['description'] if repo['description'] else '-'))
       lst_content.append(self._item('Pulls', repo['pull_count']))
       lst_content.append(self._item('Registered', self._format_date(repo['date_registered'])))

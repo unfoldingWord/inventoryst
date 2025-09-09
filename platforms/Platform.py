@@ -61,6 +61,7 @@ class Platform:
         dict_style = {
             'color': color,
             'weight': weight,
+            'padding': '1px'
         }
         if background:
             dict_style['background'] = background
