@@ -5,15 +5,18 @@ class DockerHub(Platform):
   def __init__(self):
     super().__init__()
 
+    # Loading configuration
+    self.__config = self._load_config()['dockerhub']
+
     self.__api_url = 'https://hub.docker.com/v2'
-    self.__org_name = self._get_env('DOCKER_ORG')
+    self.__org_name = self.__config['org']
     api_access_token = self.__request_access_token()
     self.__headers = [
       ['Authorization', 'Bearer ' + api_access_token],
     ]
 
   def __request_access_token(self):
-    org_access_token = self._get_env('DOCKER_OAT')
+    org_access_token = self.__config['oat']
     url = f"{self.__api_url}/auth/token"
     data = {
       'identifier': self.__org_name,
@@ -43,7 +46,7 @@ class DockerHub(Platform):
       lst_repo_field_filter = ['name', 'status_description', 'description', 'is_private', 'pull_count',
                                'last_updated', 'date_registered', 'categories', 'storage_size']
       for repository in repo_data['results']:
-        dict_repo = self._field_filter(repository, lst_repo_field_filter)
+        dict_repo = self._filter_fields(repository, lst_repo_field_filter)
 
         # Supplement with tag data
         tag_data = self.__enumerate_repository_tags(repository['name'])
@@ -68,7 +71,7 @@ class DockerHub(Platform):
 
       lst_tag_field_filter = ['name', 'last_updated', 'full_size', 'tag_last_pushed', 'digest']
       for tag in tag_data['results']:
-        dict_tag = self._field_filter(tag, lst_tag_field_filter)
+        dict_tag = self._filter_fields(tag, lst_tag_field_filter)
         dict_tags['content'].append(dict_tag)
 
     return dict_tags
@@ -105,7 +108,7 @@ class DockerHub(Platform):
     if 'results' in users:
       dict_users['meta']['user_count'] = users['count']
       for user in users['results']:
-        dict_user = self._field_filter(user, list_user_field_filter)
+        dict_user = self._filter_fields(user, list_user_field_filter)
         dict_users['content']['users'].append(dict_user)
 
     # Get the teams
@@ -115,7 +118,7 @@ class DockerHub(Platform):
     if 'results' in teams:
       dict_users['meta']['team_count'] = teams['count']
       for team in teams['results']:
-        dict_team = self._field_filter(team, list_team_field_filter)
+        dict_team = self._filter_fields(team, list_team_field_filter)
 
         members = self.__enumerate_group_members(dict_team['name'])
         if 'results' in members:
