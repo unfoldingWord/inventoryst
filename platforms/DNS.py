@@ -158,7 +158,7 @@ class DNS(Platform):
             domains = domains[0:5]
 
         for item in domains:
-            self._logger.info(f"Collecting info for '{item['domain'].lower()}'")
+            self._logger.debug(f"Collecting info for '{item['domain'].lower()}'")
 
             domain = dict()
             domain["name"] = item["domain"].lower()
