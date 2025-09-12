@@ -4,7 +4,7 @@ import logging
 import os
 from dateutil import parser
 import requests
-
+import yaml
 
 class Platform:
     def __init__(self):
@@ -13,11 +13,12 @@ class Platform:
         # Init logging
         self._logger = logging.getLogger()
 
+        # Misc
         self.__page_properties = dict()
-
         self.__pages_changed = 0
+        self.__api_calls = 0
 
-    def _get_json_from_url(self, url, headers=None, data=None):
+    def _get_json_from_url(self, url, headers=None, data=None, raw=False):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
@@ -28,15 +29,34 @@ class Platform:
                 req_headers[header[0]] = header[1]
 
         if data is None:
-            raw = requests.get(url, headers=req_headers)
+            result = requests.get(url, headers=req_headers)
         else:
-            raw = requests.post(url, json=data, headers=req_headers)
+            result = requests.post(url, json=data, headers=req_headers)
 
-        self._logger.debug(raw)
-        return raw.json()
+        self._inc_api_call()
+        self._logger.debug(result)
+
+        if raw is True:
+            return result
+        else:
+            return result.json()
+
+    def _load_config(self):
+        # YAML file path
+        yaml_file = 'inventoryst.yaml'
+
+        # Reading YAML data from file
+        with open(yaml_file, 'r') as f:
+            return yaml.load(f, Loader=yaml.FullLoader)
 
     def get_changed_page_count(self):
         return self.__pages_changed
+
+    def get_api_calls(self):
+        return self.__api_calls
+
+    def _inc_api_call(self, incr=1):
+        self.__api_calls += incr
 
     def _get_output_dir(self):
         base_path = os.getenv('OUTPUT_DIRECTORY')
@@ -46,8 +66,12 @@ class Platform:
 
         return base_path
 
-    def _field_filter(self, dict_input, field_filter):
-        return {k: v for k, v in dict_input.items() if k in field_filter}
+    def _filter_fields(self, data, field_filter):
+
+        if hasattr(data, '__dict__'):
+            return {item: eval(f"data.{item}") for item in field_filter}
+        elif type(data) == dict:
+            return {k: v for k, v in data.items() if k in field_filter}
 
     def _get_env(self, key):
         env_value = os.getenv(key)
@@ -56,11 +80,17 @@ class Platform:
 
         return env_value
 
+    def _link(self, target, caption='', internal=False):
+        if internal is True:
+            return f"[[{target}|{caption}]]"
+
+        return f"[{caption}]({target})"
+
     def _highlight(self, text, color, background='', weight='bold', border_color=''):
         # Build the style
         dict_style = {
             'color': color,
-            'weight': weight,
+            'font-weight': weight,
             'padding': '1px'
         }
         if background:
@@ -83,8 +113,12 @@ class Platform:
     def _header(self, title, size=2):
         return f"{('#' * size)} {title}"
 
-    def _format_date(self, date):
-        return parser.parse(date).strftime("%a, %b %-d, %Y, %-I:%M %p")
+    def _format_date(self, tdate):
+        date_format = "%a, %b %-d, %Y, %-I:%M %p"
+        if type(tdate) is datetime.datetime:
+            return tdate.strftime("%a, %b %-d, %Y, %-I:%M %p")
+
+        return parser.parse(tdate).strftime("%a, %b %-d, %Y, %-I:%M %p")
 
     def _format_bytes(self, size, rounding=2):
         # 2**10 = 1024
@@ -188,11 +222,8 @@ class Platform:
 
                 with open(base_path + "/" + page, 'w') as md_file:
                     # Last updated
-                    self._add_page_property('modified', datetime.datetime.utcnow().strftime("%Y-%m-%d"))
+                    self._add_page_property('modified', datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d"))
                     new_content = self.__prep_page_content(inventory[page])
-
-                    # str_date = datetime.datetime.utcnow().strftime("%B %d %Y, %I:%M %p")
-                    # md_file.write("*Last updated: " + str_date + "*\n")
 
                     md_file.write(new_content)
 
