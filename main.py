@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 from platforms import *
 import logging
-import os
 import traceback
 
 load_dotenv()
@@ -9,6 +8,7 @@ load_dotenv()
 
 class Inventoryst:
     def __init__(self):
+        self.__config = Platform.load_config('general')
         self.__logger = self.init_logger()
 
     def init_logger(self):
@@ -16,7 +16,7 @@ class Inventoryst:
 
         if not this_logger.hasHandlers():
             c_handler = logging.StreamHandler()
-            if os.getenv('STAGE', False) == 'dev':
+            if self.__config['stage'] == 'dev':
                 c_handler.setLevel(logging.DEBUG)
                 this_logger.setLevel(logging.DEBUG)
             else:
@@ -32,36 +32,24 @@ class Inventoryst:
         return this_logger
 
     def inventorize(self):
-        lst_inventories_to_fetch = os.getenv('FETCH_INVENTORIES').split(',')
-
-        map_inventories = {
-            'readthedocs': 'ReadTheDocs', # ReadTheDocs
-            'netlify': 'Netlify',         # Netlify
-            'dns': 'DNS',                 # DNS (EPIK, Namecheap)
-            'mysql': 'MySQL',             # MySQL
-            'zoom': 'Zoom',               # Zoom
-            'discourse': 'Discourse',     # Discourse
-            'notion': 'Notion',           # Notion
-            'dockerhub': 'DockerHub',     # Docker Hub
-            'github': 'Github'            # Github
-        }
+        lst_inventories_to_fetch = self.__config['inventories']
 
         # Process all requested platforms
         processed_platforms = 0
         page_change_count = 0
         api_calls = dict()
         for platform in lst_inventories_to_fetch:
-            self.__logger.info(f'Processing {map_inventories[platform]}...')
+            self.__logger.info(f'Processing {platform}...')
 
             try:
-                obj_platform = eval(f"{map_inventories[platform]}()")
+                obj_platform = eval(f"{platform}()")
                 obj_platform.inventorize()
                 processed_platforms += 1
                 api_calls[platform] = obj_platform.get_api_calls()
                 page_change_count += obj_platform.get_changed_page_count()
 
             except Exception as e:
-                self.__logger.error(f"Processing of {map_inventories[platform]} encountered an error")
+                self.__logger.error(f"Processing of {platform} encountered an error")
                 self.__logger.error(e)
                 traceback.print_exc()
 

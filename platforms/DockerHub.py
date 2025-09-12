@@ -6,7 +6,7 @@ class DockerHub(Platform):
     super().__init__()
 
     # Loading configuration
-    self.__config = self._load_config()['dockerhub']
+    self.__config = self.load_config('dockerhub')
 
     self.__api_url = 'https://hub.docker.com/v2'
     self.__org_name = self.__config['org']
@@ -137,7 +137,7 @@ class DockerHub(Platform):
 
     # Repositories
     for repo in dict_repositories['content']:
-      lst_content.append(self._header(repo['name']))
+      lst_content.append(self._header(repo['name'], size=3))
       if repo['status_description'] == 'archived':
         status = self._highlight(repo['status_description'], color='#a9470f', background='#fff4dc')
       else:

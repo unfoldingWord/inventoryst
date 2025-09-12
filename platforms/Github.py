@@ -10,7 +10,7 @@ class Github(Platform):
     super().__init__()
 
     # Load config
-    self.__config = self._load_config()['github']
+    self.__config = self.load_config('github')
 
     # Determine organization to inventorize for today
     dict_org = self.__determine_org(self.__config)

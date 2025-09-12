@@ -11,6 +11,7 @@ class Platform:
         self._now = datetime.datetime.now(tz=datetime.timezone.utc)
 
         # Init logging
+        self.__config = self.load_config('general')
         self._logger = logging.getLogger()
 
         # Misc
@@ -41,13 +42,14 @@ class Platform:
         else:
             return result.json()
 
-    def _load_config(self):
+    @staticmethod
+    def load_config(platform):
         # YAML file path
         yaml_file = 'inventoryst.yaml'
 
         # Reading YAML data from file
         with open(yaml_file, 'r') as f:
-            return yaml.load(f, Loader=yaml.FullLoader)
+            return yaml.safe_load(f)[platform]
 
     def get_changed_page_count(self):
         return self.__pages_changed
@@ -59,7 +61,7 @@ class Platform:
         self.__api_calls += incr
 
     def _get_output_dir(self):
-        base_path = os.getenv('OUTPUT_DIRECTORY')
+        base_path = self.__config['output_directory']
         if not base_path:
             # Assuming we're in Docker mode ;-)
             base_path = '/app/output'
