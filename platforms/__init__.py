@@ -7,3 +7,4 @@ from .Zoom import Zoom
 from .Discourse import Discourse
 from .Notion import Notion
 from .DockerHub import DockerHub
+from .Github import Github

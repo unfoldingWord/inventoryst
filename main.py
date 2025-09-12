@@ -42,12 +42,14 @@ class Inventoryst:
             'zoom': 'Zoom',               # Zoom
             'discourse': 'Discourse',     # Discourse
             'notion': 'Notion',           # Notion
-            'dockerhub': 'DockerHub'      # Docker Hub
+            'dockerhub': 'DockerHub',     # Docker Hub
+            'github': 'Github'            # Github
         }
 
         # Process all requested platforms
         processed_platforms = 0
         page_change_count = 0
+        api_calls = dict()
         for platform in lst_inventories_to_fetch:
             self.__logger.info(f'Processing {map_inventories[platform]}...')
 
@@ -55,12 +57,15 @@ class Inventoryst:
                 obj_platform = eval(f"{map_inventories[platform]}()")
                 obj_platform.inventorize()
                 processed_platforms += 1
+                api_calls[platform] = obj_platform.get_api_calls()
                 page_change_count += obj_platform.get_changed_page_count()
 
             except Exception as e:
                 self.__logger.error(f"Processing of {map_inventories[platform]} encountered an error")
                 self.__logger.error(e)
                 traceback.print_exc()
+
+        self.__logger.debug(f'Api calls: {str(api_calls)}')
 
         self.__logger.info(f"Platforms requested: {len(lst_inventories_to_fetch)} / "
                            f"Platforms processed: {processed_platforms} / "
