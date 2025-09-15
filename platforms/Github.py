@@ -20,6 +20,9 @@ class Github(Platform):
     self.__github_api = Gh(gh_token)
     self.__github_api.per_page = 100
 
+    # Set org
+    self.__obj_org = self.__github_api.get_organization(self.__org)
+
     # Need manual API connections for specific purposes
     self.__github_api_url = 'https://api.github.com/'
     self.__headers = [
@@ -153,6 +156,75 @@ class Github(Platform):
 
     return dict_repos
 
+  def __get_team_members(self, obj_team):
+    lst_return = list()
+
+    members = obj_team.get_members()
+    self._inc_api_call()
+    for member in members:
+      lst_return.append(member.login)
+
+    return lst_return
+
+  def __enumerate_teams(self):
+    dict_teams = dict()
+    dict_teams['meta'] = dict()
+    dict_teams['content'] = list()
+
+    team_filter = ['name', 'html_url', 'description', 'privacy', 'permission']
+
+    teams = self.__obj_org.get_teams()
+    self._inc_api_call()
+
+    team_count = 0
+    for team in teams:
+      team_count += 1
+
+      # Default fields
+      dict_team = self._filter_fields(team, team_filter)
+
+      # Get team members
+      dict_team['members'] = self.__get_team_members(obj_team=team)
+
+      dict_teams['content'].append(dict_team)
+
+    dict_teams['meta']['team_count'] = team_count
+    return dict_teams
+
+  def __enumerate_users(self):
+    dict_users = dict()
+    dict_users['meta'] = dict()
+    dict_users['content'] = list()
+
+    users = self.__obj_org.get_members()
+    self._inc_api_call()
+
+    member_filter = ['login', 'html_url', 'avatar_url', 'type']
+    user_count = 0
+    for user in users:
+      user_count += 1
+
+      # Default fields
+      dict_user = self._filter_fields(user, member_filter)
+
+      # Last active
+      events = user.get_events()
+      self._inc_api_call()
+
+      last_active = None
+      for event in events:
+        last_active = event.last_modified
+        break
+
+      dict_user['last_active'] = last_active
+
+      # add to main
+      dict_users['content'].append(dict_user)
+
+    dict_users['meta']['user_count'] = user_count
+    return dict_users
+
+
   def __markdown_repos(self, org: str, dict_repos: dict):
     lst_content = list()
 
@@ -225,6 +297,42 @@ class Github(Platform):
     file = f"github/{org}/repositories.md"
     return {file: lst_content}
 
+  def __markdown_teams_and_users(self, org: str, teams: dict, users: dict):
+    lst_content = list()
+
+    # Info block
+    lst_content.append(">[!info] General information")
+    lst_content.append(self._item('Teams', teams['meta']['team_count']))
+    lst_content.append(self._item('Users', users['meta']['user_count']))
+    lst_content.append("")
+
+    # Teams
+    lst_content.append(self._header("Teams"))
+    for team in teams['content']:
+
+      lst_content.append(self._header(team['name'], 3))
+
+      description = team['description'] if team['description'] else '-'
+      lst_content.append(self._note(description))
+
+      lst_content.append(self._item('URL', team['html_url']))
+      lst_content.append(self._item('Privacy', team['privacy']))
+      lst_content.append(self._item('Permissions', team['permission']))
+      lst_content.append(self._item('Members', ', '.join(team['members'])))
+
+    # Users
+    lst_content.append(self._header('Users'))
+    for user in users['content']:
+      lst_content.append(self._header(user['login'], 3))
+      lst_content.append(f"{self._avatar(user['avatar_url'])} {self._item('URL', user['html_url'])}")
+      lst_content.append(self._item('Type', user['type']))
+
+      last_active = self._format_date(user['last_active']) if user['last_active'] else '-'
+      lst_content.append(self._item('Last active', last_active))
+
+    file = f"github/{org}/users_and_teams.md"
+    return {file: lst_content}
+
 
   def _build_content(self):
     md_main = dict()
@@ -233,6 +341,10 @@ class Github(Platform):
 
     repos = self.__enumerate_repos(self.__org)
     md_main.update(self.__markdown_repos(self.__org, repos))
+
+    teams = self.__enumerate_teams()
+    users = self.__enumerate_users()
+    md_main.update(self.__markdown_teams_and_users(self.__org, teams, users))
 
     self._logger.debug(self.__github_api.get_rate_limit())
 
