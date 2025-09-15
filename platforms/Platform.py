@@ -122,6 +122,12 @@ class Platform:
 
         return parser.parse(tdate).strftime("%a, %b %-d, %Y, %-I:%M %p")
 
+    def _avatar(self, image_url: str):
+        avatar_style = '; '.join(['display: block','object-fit: cover', 'border-radius: 100%',
+                                  'width: 50px', 'height: 50px', 'float: left', 'margin-right: 10px'])
+
+        return f'<img src="{image_url}" style="{avatar_style}" />'
+
     def _format_bytes(self, size, rounding=2):
         # 2**10 = 1024
         power = 2 ** 10
