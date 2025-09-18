@@ -196,11 +196,21 @@ class Github(Platform):
     dict_users['meta'] = dict()
     dict_users['content'] = list()
 
+    # Get all users
     users = self.__obj_org.get_members()
     self._inc_api_call()
 
+    # Get all users that have no 2FA enabled
+    users_no2fa = self.__obj_org.get_members(filter_='2fa_disabled')
+    self._inc_api_call()
+
+    lst_users_no2fa = list()
+    for user in users_no2fa:
+      lst_users_no2fa.append(user.login)
+
     member_filter = ['login', 'html_url', 'avatar_url', 'type']
     user_count = 0
+    users_no2fa_count = 0
     for user in users:
       user_count += 1
 
@@ -218,10 +228,17 @@ class Github(Platform):
 
       dict_user['last_active'] = last_active
 
+      # 2FA disabled
+      dict_user['2fa_disabled'] = False
+      if dict_user['login'] in lst_users_no2fa:
+        users_no2fa_count += 1
+        dict_user['2fa_disabled'] = True
+
       # add to main
       dict_users['content'].append(dict_user)
 
     dict_users['meta']['user_count'] = user_count
+    dict_users['meta']['user_no2fa_count'] = users_no2fa_count
     return dict_users
 
 
@@ -304,6 +321,7 @@ class Github(Platform):
     lst_content.append(">[!info] General information")
     lst_content.append(self._item('Teams', teams['meta']['team_count']))
     lst_content.append(self._item('Users', users['meta']['user_count']))
+    lst_content.append(self._item('Users without 2FA', users['meta']['user_no2fa_count']))
     lst_content.append("")
 
     # Teams
@@ -323,7 +341,11 @@ class Github(Platform):
     # Users
     lst_content.append(self._header('Users'))
     for user in users['content']:
-      lst_content.append(self._header(user['login'], 3))
+      label_no2fa = ''
+      if user['2fa_disabled'] is True:
+        label_no2fa = self._highlight('No 2FA', color='white', background='red')
+
+      lst_content.append(self._header(f"{user['login']} {label_no2fa}", 3))
       lst_content.append(f"{self._avatar(user['avatar_url'])} {self._item('URL', user['html_url'])}")
       lst_content.append(self._item('Type', user['type']))
 
@@ -339,8 +361,8 @@ class Github(Platform):
 
     self._logger.debug(self.__github_api.get_rate_limit())
 
-    repos = self.__enumerate_repos(self.__org)
-    md_main.update(self.__markdown_repos(self.__org, repos))
+    # repos = self.__enumerate_repos(self.__org)
+    # md_main.update(self.__markdown_repos(self.__org, repos))
 
     teams = self.__enumerate_teams()
     users = self.__enumerate_users()
