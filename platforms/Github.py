@@ -296,7 +296,7 @@ class Github(Platform):
 
       # Dependabot alerts
       severity_to_color = {
-        'low': ['green', 'black'],
+        'low': ['khaki', 'black'],
         'medium': ['yellow', 'black'],
         'high': ['orange', 'black'],
         'critical': ['red', 'white'],
