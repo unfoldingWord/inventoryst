@@ -93,6 +93,7 @@ class Github(Platform):
     repo_stale_count = 0
     repo_private_count = 0
     repo_total_size = 0
+    repo_with_sec_alert_counts = 0
     for obj_repo in repos:
 
       repo_count += 1
@@ -130,7 +131,11 @@ class Github(Platform):
 
         # Dependabot alerts (only if the repo is NOT archived)
         if dict_repo['archived'] is False:
-          dict_repo['dependabot_alerts'] = self.__enumerate_dependabot_alerts(obj_repo)
+          dependabot_alerts = self.__enumerate_dependabot_alerts(obj_repo)
+          if dependabot_alerts and len(dependabot_alerts) > 0:
+            repo_with_sec_alert_counts += 1
+
+          dict_repo['dependabot_alerts'] = dependabot_alerts
 
         # Releases (count)
         releases = obj_repo.get_releases()
@@ -152,6 +157,7 @@ class Github(Platform):
     dict_repos['meta']['repo_stale_count'] = repo_stale_count
     dict_repos['meta']['repo_archived_count'] = repo_archived_count
     dict_repos['meta']['repo_private_count'] = repo_private_count
+    dict_repos['meta']['repo_with_sec_alerts_count'] = repo_with_sec_alert_counts
     dict_repos['meta']['repo_total_size'] = repo_total_size
 
     return dict_repos
@@ -251,6 +257,7 @@ class Github(Platform):
     lst_content.append(self._item('Private', dict_repos['meta']['repo_private_count']))
     lst_content.append(self._item('Archived', dict_repos['meta']['repo_archived_count']))
     lst_content.append(self._item('Stale', dict_repos['meta']['repo_stale_count']))
+    lst_content.append(self._item('With Dependabot alerts', dict_repos['meta']['repo_with_sec_alerts_count']))
     lst_content.append(self._item('Total size', self._format_bytes(dict_repos['meta']['repo_total_size'] * 1024)))
     lst_content.append("")
 
@@ -361,8 +368,8 @@ class Github(Platform):
 
     self._logger.debug(self.__github_api.get_rate_limit())
 
-    # repos = self.__enumerate_repos(self.__org)
-    # md_main.update(self.__markdown_repos(self.__org, repos))
+    repos = self.__enumerate_repos(self.__org)
+    md_main.update(self.__markdown_repos(self.__org, repos))
 
     teams = self.__enumerate_teams()
     users = self.__enumerate_users()
