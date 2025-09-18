@@ -307,13 +307,17 @@ class Github(Platform):
           # Alerts are NOT enabled, this is not a good situation
           dependabot_alerts = self._highlight('Disabled', 'white', 'red')
         else:
-          dependabot_alerts = '-'
-          for alert in repo['dependabot_alerts']:
-            button_color = severity_to_color[alert['security_vulnerability'].severity][0]
-            text_color = severity_to_color[alert['security_vulnerability'].severity][1]
-            button = self._highlight(alert['security_vulnerability'].package.name, color=text_color, background=button_color, weight='normal')
+          if len(repo['dependabot_alerts']):
+            dependabot_alerts = ''
+            for alert in repo['dependabot_alerts']:
+              button_color = severity_to_color[alert['security_vulnerability'].severity][0]
+              text_color = severity_to_color[alert['security_vulnerability'].severity][1]
+              button = self._highlight(alert['security_vulnerability'].package.name, color=text_color, background=button_color, weight='normal')
 
-            dependabot_alerts += f"{button} "
+              dependabot_alerts += f"{button} "
+          else:
+            dependabot_alerts = self._highlight('None', color='white', background='green', weight='normal')
+
 
         link = self._link(f"{repo['html_url']}/security/dependabot", 'Dependabot alerts')
         lst_content.append(self._item(link, dependabot_alerts))
