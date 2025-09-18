@@ -198,30 +198,48 @@ class Github(Platform):
     return dict_teams
 
   def __enumerate_users(self):
+    # Return both members of the organisation and outside collaborators
+
     dict_users = dict()
     dict_users['meta'] = dict()
     dict_users['content'] = list()
 
-    # Get all users
+    # Get all members
     users = self.__obj_org.get_members()
     self._inc_api_call()
 
-    # Get all users that have no 2FA enabled
+    # Get all collaborators
+    collaborators = self.__obj_org.get_outside_collaborators()
+    self._inc_api_call()
+
+    # Get all members that have no 2FA enabled
     users_no2fa = self.__obj_org.get_members(filter_='2fa_disabled')
     self._inc_api_call()
 
+    # Get all collaborators that have no 2FA enabled
+    collaborators_no2fa = self.__obj_org.get_outside_collaborators(filter_='2fa_disabled')
+    self._inc_api_call()
     lst_users_no2fa = list()
+
+    # Add No2FA users and collaborators to a simple list
     for user in users_no2fa:
       lst_users_no2fa.append(user.login)
 
-    member_filter = ['login', 'html_url', 'avatar_url', 'type']
-    user_count = 0
+    for user in collaborators_no2fa:
+      lst_users_no2fa.append(user.login)
+
+    # Let's go
+    user_filter = ['login', 'html_url', 'avatar_url', 'type']
+    member_count = 0
+    collaborator_count = 0
+
+    # Members of the organisation
     users_no2fa_count = 0
     for user in users:
-      user_count += 1
+      member_count += 1
 
       # Default fields
-      dict_user = self._filter_fields(user, member_filter)
+      dict_user = self._filter_fields(user, user_filter)
 
       # Last active
       events = user.get_events()
@@ -243,7 +261,43 @@ class Github(Platform):
       # add to main
       dict_users['content'].append(dict_user)
 
-    dict_users['meta']['user_count'] = user_count
+    # Outside Collaborators
+    for user in collaborators:
+      collaborator_count += 1
+
+      # Default fields
+      dict_user = self._filter_fields(user, user_filter)
+
+      # Is collaborator
+      dict_user['outside_collaborator'] = True
+
+      # Last active
+      events = user.get_events()
+      self._inc_api_call()
+
+      last_active = None
+      for event in events:
+        last_active = event.last_modified
+        break
+
+      dict_user['last_active'] = last_active
+
+      # 2FA disabled
+      dict_user['2fa_disabled'] = False
+      if dict_user['login'] in lst_users_no2fa:
+        users_no2fa_count += 1
+        dict_user['2fa_disabled'] = True
+
+      # add to main
+      dict_users['content'].append(dict_user)
+
+    # Sort the whole list of users on login name
+    # This mixes both members and collaborators
+    dict_users['content'] = sorted(dict_users['content'], key=lambda d: d['login'].lower())
+
+
+    dict_users['meta']['member_count'] = member_count
+    dict_users['meta']['collaborator_count'] = collaborator_count
     dict_users['meta']['user_no2fa_count'] = users_no2fa_count
     return dict_users
 
@@ -331,7 +385,8 @@ class Github(Platform):
     # Info block
     lst_content.append(">[!info] General information")
     lst_content.append(self._item('Teams', teams['meta']['team_count']))
-    lst_content.append(self._item('Users', users['meta']['user_count']))
+    lst_content.append(self._item('Members', users['meta']['member_count']))
+    lst_content.append(self._item('Collaborators', users['meta']['collaborator_count']))
     lst_content.append(self._item('Users without 2FA', users['meta']['user_no2fa_count']))
     lst_content.append("")
 
@@ -360,6 +415,12 @@ class Github(Platform):
       lst_content.append(f"{self._avatar(user['avatar_url'])} {self._item('URL', user['html_url'])}")
       lst_content.append(self._item('Type', user['type']))
 
+      # Member or outside collaborator
+      user_type = 'Member'
+      if 'outside_collaborator' in user:
+        user_type = 'Outside collaborator'
+      lst_content.append(self._item('Affiliation', user_type))
+
       last_active = self._format_date(user['last_active']) if user['last_active'] else '-'
       lst_content.append(self._item('Last active', last_active))
 
@@ -372,8 +433,8 @@ class Github(Platform):
 
     self._logger.debug(self.__github_api.get_rate_limit())
 
-    repos = self.__enumerate_repos(self.__org)
-    md_main.update(self.__markdown_repos(self.__org, repos))
+    #repos = self.__enumerate_repos(self.__org)
+    #md_main.update(self.__markdown_repos(self.__org, repos))
 
     teams = self.__enumerate_teams()
     users = self.__enumerate_users()
