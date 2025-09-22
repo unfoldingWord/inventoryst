@@ -69,7 +69,7 @@ class Notion(Platform):
                 parts = user['name'].split()
                 initials = "".join([part[0] for part in parts]).upper()
 
-                avatar = self._avatar(initials, type='text')
+                avatar = self._avatar(initials, avatar_type='text')
 
             lst_content.append(f"{avatar}**{user['name']}**")
             lst_content.append(self._item('ID', user['id']))
@@ -92,7 +92,7 @@ class Notion(Platform):
                 parts = user['name'].split()
                 initials = "".join([part[0] for part in parts]).upper()
 
-                avatar = self._avatar(initials, type='text')
+                avatar = self._avatar(initials, avatar_type='text')
 
             lst_content.append(f"{avatar}**{user['name']}**")
             lst_content.append(self._item('ID', user['id']))
