@@ -13,13 +13,16 @@ class DNS(Platform):
         # Page alias
         self._add_page_property('aliases', ['Domain List'])
 
+        # Load configuration
+        self.__config = self.load_config('dns')
+
         # Namecheap
-        self.namecheap_api_key = self._get_env('NAMECHEAP_API_KEY')
-        self.namecheap_api_user = self._get_env('NAMECHEAP_API_USER')
+        self.namecheap_api_key = self.__config['namecheap']['api_key']
+        self.namecheap_api_user = self.__config['namecheap']['api_user']
         self.__namecheap_api_counter = 0
 
         # Epik
-        self.epik_api_key = self._get_env('EPIK_API_KEY')
+        self.epik_api_key = self.__config['epik']['api_key']
 
     def __get_json_from_xml(self, url):
         raw = requests.get(url)
@@ -77,7 +80,7 @@ class DNS(Platform):
         self._logger.info(f"Number of domains: {len(domains)}")
 
         # Just 5 domains is enough for local debugging
-        if self._get_env('STAGE') == 'dev':
+        if self._stage == 'dev':
             domains = domains[0:5]
 
         for item in domains:
@@ -154,7 +157,7 @@ class DNS(Platform):
         self._logger.info(f"Number of domains: {len(domains)}")
 
         # Just 5 domains is enough for local debugging
-        if self._get_env('STAGE') == 'dev':
+        if self._stage == 'dev':
             domains = domains[0:5]
 
         for item in domains:
@@ -219,7 +222,7 @@ class DNS(Platform):
 
         # Epik
         # It appears that Epik API cannot be used from Europe and/or Netherlands.
-        if not self._get_env('STAGE') == 'dev':
+        if not self._stage == 'dev':
             self._logger.info("Getting domain info from Epik")
             lst_epik_domains = self.__enumerate_epik_domains()
             lst_domains += lst_epik_domains
