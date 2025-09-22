@@ -10,8 +10,11 @@ class Platform:
     def __init__(self):
         self._now = datetime.datetime.now(tz=datetime.timezone.utc)
 
-        # Init logging
+        # Load configuration
         self.__config = self.load_config('general')
+        self._stage = self.__config['stage']
+
+        # Init logging
         self._logger = logging.getLogger()
 
         # Misc
@@ -118,32 +121,36 @@ class Platform:
     def _format_date(self, tdate):
         date_format = "%a, %b %-d, %Y, %-I:%M %p"
         if type(tdate) is datetime.datetime:
-            return tdate.strftime("%a, %b %-d, %Y, %-I:%M %p")
+            return tdate.strftime(date_format)
 
-        return parser.parse(tdate).strftime("%a, %b %-d, %Y, %-I:%M %p")
+        return parser.parse(tdate).strftime(date_format)
 
-    def _avatar(self, content: str, type='image'):
-        avatar_style = [
-            'display: block',
-            'object-fit: cover',
-            'border-radius: 100%',
-            'width: 50px',
-            'height: 50px',
-            'float: left',
-            'margin-right: 10px'
-        ]
+    def _avatar(self, content: str, avatar_type='image', style_overrides=dict()):
+        dict_avatar_style = {
+            'display': 'block',
+            'object-fit': 'cover',
+            'border-radius': '100%',
+            'width': '50px',
+            'height': '50px',
+            'float': 'left',
+            'margin-right': '10px'
+        }
 
-        if type == 'image':
-            return f'<img src="{content}" style="{'; '.join(avatar_style)}" />'
+        if avatar_type != 'image':
+            dict_avatar_style['background'] = 'gray'
+            dict_avatar_style['font-size'] = '25px'
+            dict_avatar_style['padding-top'] = '5px'
+            dict_avatar_style['text-align'] = 'center'
+
+        if len(style_overrides):
+            dict_avatar_style.update(style_overrides)
+
+        avatar_style = '; '.join([f'{key}: {dict_avatar_style[key]}' for key in dict_avatar_style])
+
+        if avatar_type == 'image':
+            return f'<img src="{content}" style="{avatar_style}" />'
         else:
-            avatar_style += [
-                'background: gray',
-                'font-size: 25px',
-                'padding-top: 5px',
-                'text-align: center'
-            ]
-
-            return f'<span style="{'; '.join(avatar_style)}">{content}</span>'
+            return f'<span style="{avatar_style}">{content}</span>'
 
     def _format_bytes(self, size, rounding=2):
         # 2**10 = 1024

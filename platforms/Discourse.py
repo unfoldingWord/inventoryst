@@ -6,9 +6,13 @@ class Discourse(Platform):
     def __init__(self):
         super().__init__()
 
-        self.discourse_api_host = self._get_env('DISCOURSE_API_HOST')
-        self.discourse_api_user = self._get_env('DISCOURSE_API_USER')
-        self.discourse_api_key = self._get_env('DISCOURSE_API_KEY')
+        # Loading configuration
+        self.__config = self.load_config('discourse')
+
+        self.discourse_api_host = self.__config['api_host']
+        self.discourse_api_user = self.__config['api_user']
+        self.discourse_api_key = self.__config['api_key']
+
 
     def __get_discourse_data(self, command):
         # https://docs.discourse.org/
@@ -21,7 +25,6 @@ class Discourse(Platform):
         ]
 
         dict_results = self._get_json_from_url(discourse_url, headers=headers)
-
         self._logger.debug(dict_results)
 
         return dict_results
@@ -35,13 +38,12 @@ class Discourse(Platform):
 
         dict_return['meta']['group_count'] = len(results['groups'])
 
+        field_filter = ['display_name', 'name', 'user_count', 'bio_raw', 'incoming_email']
         for group in results['groups']:
-            t_group = dict()
-            t_group['display_name'] = group['display_name'] if 'display_name' in group else group['full_name']
-            t_group['name'] = group['name']
-            t_group['nr_of_users'] = group['user_count']
-            t_group['description'] = group['bio_raw']
-            t_group['incoming_email'] = group['incoming_email']
+            t_group = self._filter_fields(group, field_filter)
+
+            if 'display_name' not in group:
+                t_group['display_name'] = group['full_name']
 
             dict_return['content'].append(t_group)
 
@@ -51,7 +53,7 @@ class Discourse(Platform):
         lst_content = list()
 
         lst_content.append(">[!info] General information")
-        lst_content.append(f">**Number of groups:** {groups['meta']['group_count']}")
+        lst_content.append(self._item('Number of groups', groups['meta']['group_count']))
         lst_content.append('')
 
         # Sort alphabetically on the name
@@ -59,9 +61,9 @@ class Discourse(Platform):
 
         for group in groups_sorted:
 
-            lst_content.append(f"- {group['name']} ({group['nr_of_users']} users)")
-            if group['description']:
-                lst_content.append(f"  *{group['description']}*")
+            lst_content.append(f"- {group['name']} ({group['user_count']} users)")
+            if group['bio_raw']:
+                lst_content.append(f"  *{group['bio_raw']}*")
             if group['incoming_email']:
                 lst_content.append(f"  **Incoming email**: {group['incoming_email'].replace('|', ', ')}")
 
@@ -81,16 +83,11 @@ class Discourse(Platform):
 
         dict_user = self.__get_discourse_data(f'admin/users/{t_id}.json')
 
-        t_user = dict()
-        t_user['username'] = dict_user['username']
-        t_user['name'] = dict_user['name']
-        t_user['avatar'] = dict_user['avatar_template'].replace('{size}', '64')
-        t_user['is_admin'] = dict_user['admin']
-        t_user['is_moderator'] = dict_user['moderator']
-        t_user['is_active'] = dict_user['active']
+        field_filter = ['username', 'name', 'avatar_template', 'admin', 'moderator', 'active', 'trust_level', 'created_at', 'last_seen_at']
+        t_user = self._filter_fields(dict_user, field_filter)
+
+        t_user['avatar'] = t_user['avatar_template'].replace('{size}', '64')
         t_user['trust_level'] = f"{trust_level[dict_user['trust_level']]} ({dict_user['trust_level']})"
-        t_user['created'] = self._format_date(dict_user['created_at'])
-        t_user['last_seen'] = self._format_date(dict_user['last_seen_at'])
 
         return t_user
 
@@ -99,7 +96,7 @@ class Discourse(Platform):
         dict_return["meta"] = dict()
         dict_return["content"] = list()
 
-        lst_discourse_groups = sorted(self._get_env('DISCOURSE_GROUPS').split(','))
+        lst_discourse_groups = sorted(self.__config['groups'])
 
         dict_users = dict()
 
@@ -107,16 +104,7 @@ class Discourse(Platform):
             # Get all members
             results = self.__get_discourse_data(f'groups/{group}/members.json')
 
-            dev_max_users = 3
             for user in results['members']:
-
-                # In develop mode, we only fetch 3 users per group
-                if self._get_env('STAGE') == 'dev':
-                    if dev_max_users == 0:
-                        break
-
-                    #dev_max_users -= 1
-
                 if user['id'] not in dict_users:
                     t_user = self.__get_user(user['id'])
                     t_user['groups'] = [group]
@@ -128,9 +116,9 @@ class Discourse(Platform):
         # Meta info
         dict_return["meta"] = {
             "user_count": len(dict_users),
-            "user_count_active": len([user for user in dict_users.items() if user[1]['is_active'] is True]),
-            "user_count_admin": len([user for user in dict_users.items() if user[1]['is_admin'] is True]),
-            "user_count_moderator": len([user for user in dict_users.items() if user[1]['is_moderator'] is True]),
+            "user_count_active": len([user for user in dict_users.items() if user[1]['active'] is True]),
+            "user_count_admin": len([user for user in dict_users.items() if user[1]['admin'] is True]),
+            "user_count_moderator": len([user for user in dict_users.items() if user[1]['moderator'] is True]),
             "groups_scanned": ', '.join(lst_discourse_groups)
         }
 
@@ -143,20 +131,21 @@ class Discourse(Platform):
         lst_content = list()
 
         lst_content.append(">[!info] General information")
-        lst_content.append(f">**Users:** {dict_users['meta']['user_count']}")
-        lst_content.append(f">**Active users:** {dict_users['meta']['user_count_active']}")
-        lst_content.append(f">**Admins:** {dict_users['meta']['user_count_admin']}")
-        lst_content.append(f">**Moderators:** {dict_users['meta']['user_count_moderator']}")
-        lst_content.append(f">**Groups scanned:** {dict_users['meta']['groups_scanned']}")
+        lst_content.append(self._item('Users', dict_users['meta']['user_count']))
+        lst_content.append(self._item('Active users', dict_users['meta']['user_count_active']))
+        lst_content.append(self._item('Admins', dict_users['meta']['user_count_admin']))
+        lst_content.append(self._item('Moderators', dict_users['meta']['user_count_moderator']))
+        lst_content.append(self._item('Groups scanned', dict_users['meta']['groups_scanned']))
         lst_content.append('')
 
-        # Sort alphabetically on the name
+        # Sort users alphabetically on username
         users_sorted = OrderedDict(sorted(dict_users["content"].items(), key=lambda item: item[1]["username"]))
 
         for _id, user in users_sorted.items():
+            # Avatar
             if 'avatar' in user:
-                avatar = (f'<img src="https://{self.discourse_api_host + user["avatar"]}" '
-                          f'style="width: 75px; float: left; margin-right: 10px" />')
+                style_overrides = {'width': '75px', 'height': '75px'}
+                avatar = self._avatar(f'https://{self.discourse_api_host}{user["avatar"]}', style_overrides=style_overrides)
             else:
                 avatar = ''
 
@@ -166,34 +155,31 @@ class Discourse(Platform):
                 display_name = user['name'] + " (" + user['username'] + ")"
 
             # Paste avatar image in front of name for proper alignment
-            lst_content.append(avatar + "**Name:** " + display_name)
+            lst_content.append(f'{avatar} {self._item('Name', display_name)}')
 
-            lst_content.append(f"**Created:** {user['created']}")
-            lst_content.append(f"**Last seen:** {user['last_seen']}")
+            lst_content.append(self._item('Created', self._format_date(user['created_at'])))
+            lst_content.append(self._item('Last seen', self._format_date(user['last_seen_at'])))
 
             # Status
-            status = "Active" if user['is_active'] else "Inactive"
-            status_color = "green" if user['is_active'] else "#e94b45"
-            str_status = f"<span style=\"color: {status_color}; font-weight: bold\">[{status}]</span>"
+            status = "Active" if user['active'] else "Inactive"
+            status_color = "green" if user['active'] else "#e94b45"
+            lst_content.append(self._item('Status', self._highlight(status, status_color)))
 
-            lst_content.append(f"**Status:** {str_status}")
-            lst_content.append(f"**Trust level:** {user['trust_level']}")
+            lst_content.append(self._item('Trust level', user['trust_level']))
 
             # Admin
-            admin = "yes" if user['is_admin'] else "no"
-            admin_color = "#4c82a9" if user['is_admin'] else ""
-            admin_weight = "bold" if user['is_admin'] else ""
-            str_admin = f"<span style=\"color: {admin_color}; font-weight: {admin_weight}\">{admin}</span>"
-            lst_content.append(f"**Admin:** {str_admin}")
+            admin = "yes" if user['admin'] else "no"
+            admin_color = "#4c82a9" if user['admin'] else ""
+            admin_weight = "bold" if user['admin'] else "normal"
+            lst_content.append(self._item('Admin', self._highlight(admin, admin_color, weight=admin_weight)))
 
             # Moderator
-            moderator = "yes" if user['is_moderator'] else "no"
-            mod_color = "#584a5f" if user['is_moderator'] else ""
-            mod_weight = "bold" if user['is_moderator'] else ""
-            str_moderator = f"<span style=\"color: {mod_color}; font-weight: {mod_weight}\">{moderator}</span>"
-            lst_content.append(f"**Moderator:** {str_moderator}")
+            moderator = "yes" if user['moderator'] else "no"
+            mod_color = "#4c82a9" if user['moderator'] else ""
+            mod_weight = "bold" if user['moderator'] else "normal"
+            lst_content.append(self._item('Moderator', self._highlight(moderator, mod_color, weight=mod_weight)))
 
-            lst_content.append(f"**Groups:** {', '.join(user['groups'])}")
+            lst_content.append(self._item('Groups', ', '.join(user['groups'])))
             lst_content.append('')
 
         file = "discourse/users.md"
