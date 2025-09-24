@@ -336,7 +336,8 @@ class Github(Platform):
 
       lst_content.append(self._header(f"{repo['name']} {label_private} {label_empty} {label_archived}{label_stale}", size=4))
 
-      lst_content.append(self._highlight(repo['description'], 'gray', weight='normal') if repo['description'] else '-')
+      if repo['description']:
+        lst_content.append(self._highlight(repo['description'], 'gray', weight='normal'))
       lst_content.append(self._item('URL', repo['html_url']))
       lst_content.append(self._item('Default branch', repo['default_branch']))
       lst_content.append(self._item('Commits', repo['commit_count']))
@@ -433,8 +434,8 @@ class Github(Platform):
 
     self._logger.debug(self.__github_api.get_rate_limit())
 
-    #repos = self.__enumerate_repos(self.__org)
-    #md_main.update(self.__markdown_repos(self.__org, repos))
+    repos = self.__enumerate_repos(self.__org)
+    md_main.update(self.__markdown_repos(self.__org, repos))
 
     teams = self.__enumerate_teams()
     users = self.__enumerate_users()
