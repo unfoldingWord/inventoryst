@@ -22,7 +22,7 @@ class Platform:
         self.__pages_changed = 0
         self.__api_calls = 0
 
-    def _get_json_from_url(self, url, headers=None, data=None, raw=False):
+    def _get_json_from_url(self, url, headers=None, data=None, raw=False, auth=None):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
@@ -33,9 +33,9 @@ class Platform:
                 req_headers[header[0]] = header[1]
 
         if data is None:
-            result = requests.get(url, headers=req_headers)
+            result = requests.get(url, headers=req_headers, auth=auth)
         else:
-            result = requests.post(url, json=data, headers=req_headers)
+            result = requests.post(url, json=data, headers=req_headers, auth=auth)
 
         self._inc_api_call()
         self._logger.debug(result)
@@ -122,6 +122,8 @@ class Platform:
         date_format = "%a, %b %-d, %Y, %-I:%M %p"
         if type(tdate) is datetime.datetime:
             return tdate.strftime(date_format)
+        elif type(tdate) is int:
+            return datetime.datetime.fromtimestamp(tdate).strftime(date_format)
 
         return parser.parse(tdate).strftime(date_format)
 
@@ -151,6 +153,12 @@ class Platform:
             return f'<img src="{content}" style="{avatar_style}" />'
         else:
             return f'<span style="{avatar_style}">{content}</span>'
+
+    def _pull_initials(self, name):
+        parts = name.split()
+        initials = "".join([part[0] for part in parts]).upper()
+
+        return initials
 
     def _format_bytes(self, size, rounding=2):
         # 2**10 = 1024
@@ -248,7 +256,7 @@ class Platform:
 
             if os.path.exists(f_path) is False or (not hash_old == hash_new):
                 if os.path.exists(f_path) is False:
-                    self._logger.info(f"The file '{page}' has been created.")
+                    self._logger.info(f"The page '{page}' has been created.")
                 else:
                     self._logger.info(f"Page content for '{page}' has changed. Updating...")
 
