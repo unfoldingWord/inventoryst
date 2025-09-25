@@ -1,6 +1,7 @@
 
 from .Platform import Platform
 import zulip
+from datetime import datetime
 from pprint import pp
 
 class Zulip(Platform):
@@ -23,15 +24,22 @@ class Zulip(Platform):
     members = self.__api_client.get_members()
     self._inc_api_call()
 
-    field_filter = ['user_id', 'email', 'is_active', 'is_bot', 'bot_owner_id', 'role', 'is_owner', 'full_name',
+    field_filter = ['user_id', 'email', 'delivery_email', 'is_active', 'is_bot', 'bot_owner_id', 'role', 'is_owner', 'full_name',
                     'date_joined', 'avatar_url', 'time_zone']
-    user_count = 0
-    active_count = 0
-    member_count = 0
-    admin_count = 0
-    owner_count = 0
-    guest_count = 0
-    moderator_count = 0
+
+    dict_members['meta']['user_count'] = 0
+    dict_members['meta']['active_count'] = 0
+    dict_members['meta']['member_count'] = 0
+    dict_members['meta']['owner_count'] = 0
+    dict_members['meta']['admin_count'] = 0
+    dict_members['meta']['moderator_count'] = 0
+    dict_members['meta']['guest_count'] = 0
+
+    last_presence = {}
+    if active is True:
+      last_presence = self.__api_client.get_realm_presence()['presences']
+      self._inc_api_call()
+
     for user in members['members']:
       if bots:
         if user['is_bot'] is False:
@@ -44,16 +52,39 @@ class Zulip(Platform):
         if user['is_active'] is not active:
           continue
 
-      user_count += 1
-      active_count += 1 if user['is_active'] is True else 0
-      admin_count += 1 if user['role'] == 200 else 0
-      owner_count += 1 if user['is_owner'] is True else 0
-      member_count += 1 if user['role'] == 400 else 0
-      guest_count += 1 if user['is_guest'] is True else 0
-      moderator_count += 1 if user['role'] == 300 else 0
+      dict_members['meta']['user_count'] += 1
+      dict_members['meta']['active_count'] += 1 if user['is_active'] is True else 0
+      dict_members['meta']['admin_count'] += 1 if user['role'] == 200 else 0
+      dict_members['meta']['owner_count'] += 1 if user['is_owner'] is True else 0
+      dict_members['meta']['member_count'] += 1 if user['role'] == 400 else 0
+      dict_members['meta']['guest_count'] += 1 if user['is_guest'] is True else 0
+      dict_members['meta']['moderator_count'] += 1 if user['role'] == 300 else 0
 
+      # Filter fields
       user = self._filter_fields(user, field_filter)
 
+      # For activated users, we want to see if they are really active,
+      # so we fetch their latest message
+      if active is True:
+        # Checking for presence
+        if user['email'] in last_presence:
+          user['presence'] = last_presence[user['email']]['aggregated']['timestamp']
+
+        # Checking last message
+        result = self.__api_client.get_messages({
+          'anchor': 'newest',
+          'num_before': 1,
+          'num_after': 0,
+          'narrow': [{'operator': 'sender', 'operand': user['email']}]
+        })
+
+        latest_message = result['messages'][0] if 'messages' in result and result['messages'] else None
+        if latest_message:
+          user['last_message_sent'] = latest_message['timestamp']
+        else:
+          user['last_message_sent'] = None
+
+      # For bots, we want to know the owner
       if bots is True:
         if user['bot_owner_id'] is not None:
           owner = self.__api_client.get_user_by_id(user['bot_owner_id'])
@@ -65,14 +96,6 @@ class Zulip(Platform):
           user['bot_owner'] = 'No owner'
 
       dict_members['content'].append(user)
-
-    dict_members['meta']['user_count'] = user_count
-    dict_members['meta']['active_count'] = active_count
-    dict_members['meta']['member_count'] = member_count
-    dict_members['meta']['owner_count'] = owner_count
-    dict_members['meta']['admin_count'] = admin_count
-    dict_members['meta']['moderator_count'] = moderator_count
-    dict_members['meta']['guest_count'] = guest_count
 
     return dict_members
 
@@ -111,7 +134,7 @@ class Zulip(Platform):
           channel['creator'] = creator['user']['full_name']
 
       # Subscribers
-      sub_url = f'https://unfoldingword.zulipchat.com/api/v1/streams/{channel['stream_id']}/members'
+      sub_url = f'{self.__config['site']}/api/v1/streams/{channel['stream_id']}/members'
       sub_ids = self._get_json_from_url(sub_url, auth=self.__auth)
       if 'subscribers' in sub_ids:
         subscriber_ids = sub_ids['subscribers']
@@ -180,11 +203,14 @@ class Zulip(Platform):
     lst_content.append('')
 
     for channel in dict_channels['content']:
-      label_archived = self._highlight('Archived', color='gray', border_color='gray') if channel['is_archived'] else ''
-      label_private = self._highlight('Private', color='gray', border_color='gray') if channel['invite_only'] else ''
-      label_public = self._highlight('Public', color='white', background='red') if channel['is_web_public'] else ''
+      lst_labels = [
+        self._highlight('Archived', color='gray', border_color='gray') if channel['is_archived'] else '',
+        self._highlight('Private', color='gray', border_color='gray') if channel['invite_only'] else '',
+        self._highlight('Stale', color='gray', border_color='gray') if channel['is_recently_active'] is False else '',
+        self._highlight('Public', color='white', background='red') if channel['is_web_public'] else ''
+      ]
 
-      lst_content.append(f'{self._header(channel['name'], 3)} {label_public} {label_private} {label_archived}')
+      lst_content.append(f'{self._header(channel['name'], 3)} {' '.join(lst_labels)}')
       lst_content.append(self._note(channel['description'] if channel['description'] else 'No description'))
       lst_content.append(self._item('Created', self._format_date(channel['date_created'])))
       lst_content.append(self._item('Creator', channel['creator'] if 'creator' in channel else 'Unknown'))
@@ -197,7 +223,6 @@ class Zulip(Platform):
 
     file = 'zulip/channels.md'
     return {file: lst_content}
-
 
   def __markdown_groups(self, dict_groups):
     lst_content = list()
@@ -221,6 +246,7 @@ class Zulip(Platform):
   def __markdown_members(self, dict_users, active=None, bots=False):
     lst_content = list()
 
+    # General info box
     lst_content.append(">[!info] General information")
     count_type = 'bots' if bots is True else 'users'
     lst_content.append(self._item(f'Total number of {count_type}', f"{dict_users['meta']['user_count']}"))
@@ -251,20 +277,52 @@ class Zulip(Platform):
       else:
         avatar = self._avatar(self._pull_initials(user['full_name']), avatar_type='text')
 
-      # Active
-      label_active = self._highlight('Deactivated', 'gray', border_color='gray') if user['is_active'] is False else ''
+      # Deactivated
+      label_deactivated = self._highlight('Deactivated', 'gray', border_color='gray') if user['is_active'] is False else ''
 
       # Bots
       label_bot = self._highlight('Bot', 'gray', border_color='gray') if user['is_bot'] is True else ''
 
-      lst_content.append(f"{avatar}**{user['full_name']}** {label_bot} {label_active}")
+      # Activity: Mark inactive when not logged in or not sent a message for a certain period
+      label_activity = ''
+      inactive_day_limit = self.__config['user']['inactive_days']
+      date_last_active = None
+      if 'presence' in user and user['presence']:
+        date_last_active = datetime.fromtimestamp(user['presence'])
+      elif 'last_message_sent' in user and user['last_message_sent']:
+        date_last_active = datetime.fromtimestamp(user['last_message_sent'])
 
-      lst_content.append(self._item('Email', user['email']))
+      # If we have a date last active, we can do a label
+      if date_last_active:
+        delta = datetime.today() - date_last_active
+
+        if delta.days >= inactive_day_limit:
+          label_activity = self._highlight(f'Inactive ({delta.days} days)', color='gray', border_color='gray')
+
+      lst_content.append(f"{avatar}**{user['full_name']}** {label_bot} {label_deactivated} {label_activity}")
+
+      lst_content.append(self._item('Email', user['delivery_email']))
       if user['is_bot'] is True:
           lst_content.append(self._item('Bot owner', user['bot_owner']))
 
       lst_content.append(self._item('Role', role_to_title[user['role']]))
       lst_content.append(self._item('Date joined', self._format_date(user['date_joined'])))
+
+      # Only for active, non-bot users
+      if active is True and bots is False:
+        # Presence
+        if 'presence' in user and user['presence']:
+          presence = self._format_date(user['presence'])
+        else:
+          presence = self._highlight('Unknown', 'white', background='orange')
+        lst_content.append(self._item('Last seen', presence))
+
+        # Last message sent
+        if 'last_message_sent' in user and user['last_message_sent']:
+          last_message_sent = self._format_date(user['last_message_sent'])
+        else:
+          last_message_sent = self._highlight('Unknown', 'white', background='orange')
+        lst_content.append(self._item('Last message sent', last_message_sent))
 
       lst_content.append('')
 
@@ -280,7 +338,7 @@ class Zulip(Platform):
   def _build_content(self):
     md_main = dict()
 
-    # Active users
+    # # Active users
     members = self.__enumerate_members(active=True)
     md_main.update(self.__markdown_members(members, active=True))
 
