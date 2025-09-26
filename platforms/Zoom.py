@@ -1,10 +1,10 @@
 from .Platform import Platform
-import os
 import base64
 import requests
 from dateutil import parser as date_parser, relativedelta
 import datetime
 import pprint
+import time
 
 # https://marketplace.zoom.us/develop/apps/
 # https://developers.zoom.us/docs/api/
@@ -14,12 +14,20 @@ class Zoom(Platform):
     def __init__(self):
         super().__init__()
 
+        self.__config = self.load_config('zoom')
+
         self.access_token = self.__request_access_token()
 
+        self.__headers = [
+            ['Authorization', 'Bearer ' + self.access_token],
+            ['Content-Type', 'application/x-www-form-urlencoded'],
+        ]
+
     def __request_access_token(self):
-        account_id = os.getenv('ZOOM_ACCOUNT_ID')
-        client_id = os.getenv('ZOOM_CLIENT_ID')
-        client_secret = os.getenv('ZOOM_CLIENT_SECRET')
+        account_id = self.__config['account_id']
+        client_id = self.__config['client_id']
+        client_secret = self.__config['client_secret']
+
         zoom_api = 'https://zoom.us/oauth/token'
 
         encoded_auth = base64.b64encode((client_id + ":" + client_secret).encode('utf-8')).decode('utf-8')
@@ -35,20 +43,6 @@ class Zoom(Platform):
         response = requests.post(zoom_api, dict_post_data, headers=dict_headers)
 
         return response.json()['access_token']
-
-    def __make_api_request(self, api_url):
-
-        dict_headers = dict()
-        dict_headers['Content-Type'] = "application/x-www-form-urlencoded"
-        dict_headers['Authorization'] = "Bearer " + self.access_token
-
-        if '?' in api_url:
-            qs = '&page_size=100'
-        else:
-            qs = '?page_size=100'
-
-        response = requests.get(api_url + qs, headers=dict_headers)
-        return response.json()
 
     def __month_range(self, start_date, end_date):
 
@@ -81,26 +75,20 @@ class Zoom(Platform):
 
         return dict_month_range
 
-    def __get_plan_usage(self):
-        usage = self.__make_api_request('https://api.zoom.us/v2/accounts/me/plans/usage')
-        # pprint.pprint(usage)
-        return usage
-
-    def __get_recording_stats(self, user_id):
+    def __get_recording_stats(self, user_id, start_date):
         # As of my current knowledge, there is no way to know if a user even has recordings or not.
         # We can only request recordings per user, even more limited by the fact that we can only
         # request recordings over a period of maximum a month.
         # This forces us to iterate, per user, over all the months that recordings could have taken place
-        # Therefore, this is a very expensive operation. As of the moment of writing,
-        # this results in 34 users x 48 months = 1632 API requests, taking up to 20 minutes!
+        # Therefore, this is a very expensive operation. We have been able to tame it a bit by
+        # using the creation_date of a user as the start date for searching, as a user can only create recordings
+        # when they themselves have been created.
 
-        # Oldest recording (manually checked) is 2020-08-01
         # Recordings can only be fetched per month, so we need to query multiple times
-        start_date = datetime.date(2020, 8, 1)
+        start_date = date_parser.parse(start_date).date()
         end_date = datetime.date.today()
 
         range_months = self.__month_range(start_date, end_date)
-        # pprint.pprint(range_months)
 
         total_recording_number = 0
         total_recording_size = 0
@@ -108,10 +96,9 @@ class Zoom(Platform):
 
         for start_date in range_months:
             end_date = range_months[start_date]
-            api_url = f'https://api.zoom.us/v2/users/{user_id}/recordings?from={start_date}&to={end_date}'
-            # print(api_url)
+            api_url = f'https://api.zoom.us/v2/users/{user_id}/recordings?from={start_date}&to={end_date}?page_size=300'
 
-            recordings = self.__make_api_request(api_url)
+            recordings = self._get_json_from_url(api_url, self.__headers)
             if recordings['total_records'] > 0:
                 # pprint.pprint(recordings)
 
@@ -123,6 +110,11 @@ class Zoom(Platform):
                     for file in recording['recording_files']:
                         total_recording_size += file['file_size']
 
+            # We are getting errors of 'Remote end closed connection without response'
+            # As this might have to do with us overheating the system, we are building in sleep time
+            # This is a shot in the dark, though...
+            time.sleep(1)
+
         dict_recording_stats = {
             'total_recordings': total_recording_number,
             'total_recordings_size': total_recording_size,
@@ -131,17 +123,12 @@ class Zoom(Platform):
 
         return dict_recording_stats
 
-    def __get_user(self, user_id):
-        user = self.__make_api_request(f'https://api.zoom.us/v2/users/{user_id}')
-
-        return user
-
     def __enumerate_rooms(self):
         dict_rooms = dict()
         dict_rooms["meta"] = dict()
         dict_rooms["content"] = list()
 
-        rooms = self.__make_api_request('https://api.zoom.us/v2/rooms')
+        rooms = self._get_json_from_url('https://api.zoom.us/v2/rooms?page_size=100', self.__headers)
         pprint.pprint(rooms)
 
         dict_rooms["meta"]["room_count"] = len(rooms['rooms'])
@@ -161,11 +148,12 @@ class Zoom(Platform):
         dict_users["meta"] = dict()
         dict_users["content"] = list()
 
-        dict_plan_usage = self.__get_plan_usage()
+        # Get plan usage
+        url_usage = 'https://api.zoom.us/v2/accounts/me/plans/usage?page_size=100'
+        dict_plan_usage = self._get_json_from_url(url_usage, self.__headers)
 
-        users = self.__make_api_request('https://api.zoom.us/v2/users')
-        # pprint.pprint(users)
-        # exit()
+        url_users = 'https://api.zoom.us/v2/users?page_size=100'
+        users = self._get_json_from_url(url_users, self.__headers)
 
         # Users
         dict_users["meta"]["user_count"] = users['total_records']
@@ -190,31 +178,24 @@ class Zoom(Platform):
         rec_fetch_limit = 0
         for user in users['users']:
 
-            dict_additional_user_data = self.__get_user(user['id'])
+            url_user = f'https://api.zoom.us/v2/users/{user['id']}'
+            dict_additional_user_data = self._get_json_from_url(url_user, self.__headers)
 
-            tmp_user = dict()
-            tmp_user['id'] = user['id']
+            field_filter = ['id', 'first_name', 'last_name', 'display_name', 'email', 'pmi', 'last_client_version',
+                            'last_login_time', 'verified', 'type', 'role_id', 'pic_url', 'user_created_at']
+
+            tmp_user = self._filter_fields(user, field_filter)
+
             tmp_user['full_name'] = user['first_name'] + ' ' + user['last_name']
-            tmp_user['display_name'] = user['display_name']
-            tmp_user['email'] = user['email']
-            tmp_user['pmi'] = user['pmi']
             tmp_user['personal_meeting_url'] = dict_additional_user_data['personal_meeting_url']
-            if 'last_client_version' in user:
-                tmp_user['last_client_version'] = user['last_client_version']
-            tmp_user['last_login'] = user['last_login_time']
-            tmp_user['verified'] = user['verified']
-            tmp_user['type'] = user['type']
-            tmp_user['role_id'] = user['role_id']
-            if 'pic_url' in user:
-                tmp_user['avatar'] = user['pic_url']
 
             # Recordings statistics
             # On development, we only try to fetch recordings for a few users,
             # as this is an expensive (time-wise) operation
             if rec_fetch_limit < 3:
-                recordings = self.__get_recording_stats(user['id'])
+                recordings = self.__get_recording_stats(user['id'], user['user_created_at'])
                 tmp_user['recording_stats'] = recordings
-                if os.getenv('STAGE') == 'dev':
+                if self._stage == 'dev':
                     rec_fetch_limit += 1
 
             dict_users['content'].append(tmp_user)
@@ -226,58 +207,64 @@ class Zoom(Platform):
         lst_content = list()
 
         lst_content.append(">[!info] General information")
-        lst_content.append("**[Users total](https://us02web.zoom.us/account/user#/):** " +
-                           str(inventory["meta"]["user_count"]))
-        lst_content.append("**Owners:** " + str(inventory["meta"]["owner_count"]))
-        lst_content.append("**Admins:** " + str(inventory["meta"]["admin_count"]))
-        lst_content.append("**Members:** " + str(inventory["meta"]["member_count"]))
-        lst_content.append('>\n>---')
-        lst_content.append("**[Licenses](https://admin.zoom.us/billing):** " +
-                           str(inventory["meta"]["licenses_available"]))
-        lst_content.append("**Licenses used:** " + str(inventory["meta"]["licenses_used"]))
-        lst_content.append('>\n>---')
-        lst_content.append("**[Recording storage](https://admin.zoom.us/recording/management):** " +
-                           str(inventory["meta"]["recording_storage"]))
-        lst_content.append("**Recording storage used:** " + str(inventory["meta"]["recording_storage_used"]))
 
+        # Users
+        lst_content.append(self._item(self._link('https://us02web.zoom.us/account/user#', 'Users total'),
+                                      inventory["meta"]["user_count"]))
+        lst_content.append(self._item('Owners', inventory["meta"]["owner_count"]))
+        lst_content.append(self._item('Admins', inventory["meta"]["admin_count"]))
+        lst_content.append(self._item('Members', inventory["meta"]["member_count"]))
+        lst_content.append('>\n>---')
+
+        # Licenses
+        lst_content.append(self._item(self._link('https://admin.zoom.us/billing', 'Licenses'),
+                                      inventory["meta"]["licenses_available"]))
+        lst_content.append(self._item('Licenses uesd', inventory["meta"]["licenses_used"]))
+        lst_content.append('>\n>---')
+
+        # Recordings
+        lst_content.append(self._item(self._link('https://admin.zoom.us/recording/management', 'Recording storage'),
+                                      inventory["meta"]["recording_storage"]))
+        lst_content.append(self._item('Recording storage used', inventory["meta"]["recording_storage_used"]))
         lst_content.append("")
 
+        # All the users
         lst_users = sorted(inventory["content"], key=lambda item: item["full_name"])
-
         for dict_user in lst_users:
-            if 'avatar' in dict_user:
-                avatar = '<img src="' + dict_user['avatar'] + '" style="width: 75px; float: left; margin-right: 10px" />'
+            avatar_style = {'width': '75px', 'height': '75px'}
+            if 'pic_url' in dict_user:
+                avatar = self._avatar(dict_user['pic_url'], avatar_type='image', style_overrides=avatar_style)
             else:
-                avatar = ''
+                avatar = self._avatar(self._pull_initials(dict_user['full_name']), avatar_type='text', style_overrides=avatar_style)
 
             if dict_user['full_name'] == dict_user['display_name']:
                 display_name = dict_user['full_name']
             else:
                 display_name = dict_user['full_name'] + " (" + dict_user['display_name'] + ")"
-            # Paste avatar image in front of name for proper alignment
-            lst_content.append(avatar + "**Name:** " + display_name)
 
-            lst_content.append("**PMI:** " + str(dict_user['pmi']))
-            lst_content.append("**Personal meeting URL:** " + dict_user['personal_meeting_url'])
-            lst_content.append("**Email:** " + dict_user['email'])
+            lst_content.append(f'{avatar}{self._item('Name', display_name)}')
+            lst_content.append(self._item('Created', self._format_date(dict_user['user_created_at'])))
 
-            last_login = date_parser.parse(dict_user['last_login']).strftime("%a, %b %-d, %Y, %-I:%M %p")
-            lst_content.append("**Last login:** " + last_login)
+            lst_content.append(self._item('PMI', dict_user['pmi']))
+            lst_content.append(self._item('Personal meeting URL', dict_user['personal_meeting_url']))
+            lst_content.append(self._item('Email', dict_user['email']))
+
+            lst_content.append(self._item('Last login', self._format_date(dict_user['last_login_time'])))
 
             if 'last_client_version' in dict_user:
-                lst_content.append("**Last client:** " + dict_user['last_client_version'])
+                lst_content.append(self._item('Last client', dict_user['last_client_version']))
 
             if dict_user['type'] == 2:
                 lic_type = "Licensed"
             else:
                 lic_type = "Basic"
-            lst_content.append("**Type:** " + lic_type)
+            lst_content.append(self._item('Type', lic_type))
 
             if dict_user['role_id'] == '1':
                 role = 'Admin'
             else:
                 role = 'Member'
-            lst_content.append("**Role:** " + role)
+            lst_content.append(self._item('Role', role))
 
             # Recordings
             if 'recording_stats' in dict_user:
@@ -291,14 +278,15 @@ class Zoom(Platform):
 
                     recording_size = self._format_bytes(dict_user['recording_stats']['total_recordings_size'])
 
-                    # If size of recordings is greater than X GB, we do some markup around it!
+                    # If size of recordings is greater than X GB, we make it a warning
+                    recording_warning_size = self.__config['recording_warning_size']
                     recording_size_display = recording_size
-                    if int(dict_user['recording_stats']['total_recordings_size']) > (1024 * 1024 * 1024 * 5):
+                    if int(dict_user['recording_stats']['total_recordings_size']) > (1024 * 1024 * 1024 * recording_warning_size):
                         recording_size_display = self._highlight(recording_size, 'white', 'red')
 
-                    lst_content.append("**Recordings:** " + str(dict_user['recording_stats']['total_recordings']) +
+                    lst_content.append(self._item('Recordings', str(dict_user['recording_stats']['total_recordings']) +
                                        " | " + recording_length +
-                                       " | " + recording_size_display)
+                                       " | " + recording_size_display))
 
             lst_content.append("")
 
