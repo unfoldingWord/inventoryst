@@ -2,6 +2,8 @@ from dotenv import load_dotenv
 from platforms import *
 import logging
 import traceback
+import datetime
+from pprint import pp
 
 load_dotenv()
 
@@ -10,6 +12,7 @@ class Inventoryst:
     def __init__(self):
         self.__config = Platform.load_config('general')
         self.__logger = self.init_logger()
+        self.__metrics = {'inventoryst': {}}
 
     def init_logger(self):
         this_logger = logging.getLogger()
@@ -31,6 +34,10 @@ class Inventoryst:
 
         return this_logger
 
+    def __add_metric(self, key, value):
+        ts = datetime.datetime.now()
+        self.__metrics['inventoryst'][key] = value
+
     def inventorize(self):
         lst_inventories_to_fetch = self.__config['inventories']
 
@@ -40,6 +47,7 @@ class Inventoryst:
         api_calls = dict()
         for platform in lst_inventories_to_fetch:
             self.__logger.info(f'Processing {platform}...')
+            date_start = datetime.datetime.now()
 
             try:
                 obj_platform = eval(f"{platform}()")
@@ -53,7 +61,14 @@ class Inventoryst:
                 self.__logger.error(e)
                 traceback.print_exc()
 
+            date_end = datetime.datetime.now()
+            duration = date_end - date_start
+
+            p_metrics = {'duration': f'{duration.seconds}.{round(duration.microseconds, 2)}'}
+            self.__add_metric(platform, p_metrics)
+
         self.__logger.debug(f'Api calls: {str(api_calls)}')
+        self.__logger.info(f'Metrics: {str(self.__metrics)}')
 
         self.__logger.info(f"Platforms requested: {len(lst_inventories_to_fetch)} / "
                            f"Platforms processed: {processed_platforms} / "
