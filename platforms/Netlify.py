@@ -131,7 +131,7 @@ class Netlify(Platform):
         dict_sites["meta"]["site_count"] = len(lst_sites)
 
         field_filter = ['created_at', 'default_domain', 'site_id', 'name', 'ssl_url', 'disabled']
-        for site in lst_sites[:5]:
+        for site in lst_sites:
 
             dict_site = self._filter_fields(site, field_filter)
 
