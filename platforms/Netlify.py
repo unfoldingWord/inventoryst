@@ -181,7 +181,8 @@ class Netlify(Platform):
             lst_content.append(self._item('Netlify domain', site['default_domain']))
             lst_content.append(self._item('ID', f"`{site['site_id']}`"))
             lst_content.append(self._item('Created', site['created_at']))
-            lst_content.append(self._item('Updated', site['updated']))
+            if 'updated' in site:
+                lst_content.append(self._item('Updated', site['updated']))
 
             if 'repository' in site:
                 lst_content.append(self._item('Repository', site['repository']))
