@@ -3,6 +3,8 @@ from platforms import *
 import logging
 import traceback
 import datetime
+import psutil
+import os
 from pprint import pp
 
 load_dotenv()
@@ -47,7 +49,8 @@ class Inventoryst:
         api_calls = dict()
         for platform in lst_inventories_to_fetch:
             self.__logger.info(f'Processing {platform}...')
-            date_start = datetime.datetime.now()
+            duration_date_start = datetime.datetime.now()
+            memory_usage_start = psutil.Process(os.getpid()).memory_info().rss
 
             try:
                 obj_platform = eval(f"{platform}()")
@@ -61,10 +64,18 @@ class Inventoryst:
                 self.__logger.error(e)
                 traceback.print_exc()
 
-            date_end = datetime.datetime.now()
-            duration = date_end - date_start
+            # Time spent
+            duration_date_end = datetime.datetime.now()
+            duration = duration_date_end - duration_date_start
 
-            p_metrics = {'duration': f'{duration.seconds}.{round(duration.microseconds, 2)}'}
+            # Memory usage
+            memory_usage_end = psutil.Process(os.getpid()).memory_info().rss
+            memory_usage = memory_usage_end - memory_usage_start
+
+            p_metrics = {
+                'duration': f'{duration.seconds}.{round(duration.microseconds, 2)}',
+                'memory_usage': memory_usage
+            }
             self.__add_metric(platform, p_metrics)
 
         self.__logger.debug(f'Api calls: {str(api_calls)}')
