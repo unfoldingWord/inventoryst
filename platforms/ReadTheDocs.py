@@ -1,18 +1,20 @@
-from dateutil import parser, relativedelta
-
 from .Platform import Platform
-
 
 class ReadTheDocs(Platform):
     def __init__(self):
         super().__init__()
-        self.api_url = self._get_env('READTHEDOCS_API_URL')
-        self.api_key = self._get_env('READTHEDOCS_API_KEY')
+
+        self.__config = self.load_config('readthedocs')
+
+        self.__api_url = 'https://readthedocs.org/api/v3/'
+        api_key = self.__config['api_key']
+
+        self.__headers = [['Authorization', 'Token ' + api_key]]
 
     def __get_build_details(self, slug):
-        url_builds = self.api_url + f"/projects/{slug}/builds/"
+        url_builds = f"{self.__api_url}/projects/{slug}/builds/"
 
-        dict_builds = self._get_json_from_url(url=url_builds, headers=[['Authorization', 'Token ' + self.api_key]])
+        dict_builds = self._get_json_from_url(url=url_builds, headers=self.__headers)
 
         # RtD returns builds in reverse order of build dates. So last build comes first!
         last_build = dict_builds['results'][0]
@@ -22,117 +24,78 @@ class ReadTheDocs(Platform):
             "date_finished": last_build["finished"]
         }
 
-    def __get_readable_timedelta(self, date):
-        # Currently, this function is not being used
-        # Keeping it for maybe later usage
-        my_date = parser.parse(date)
-
-        fancy_delta = relativedelta.relativedelta(self._now, my_date)
-
-        shiny_list = list()
-
-        if fancy_delta.years > 0:
-            suffix = " year" if fancy_delta.years == 1 else " years"
-            shiny_list.append(str(fancy_delta.years) + suffix)
-
-        if fancy_delta.months > 0:
-            suffix = " month" if fancy_delta.months == 1 else " months"
-            shiny_list.append(str(fancy_delta.months) + suffix)
-
-        if fancy_delta.weeks > 0:
-            suffix = " week" if fancy_delta.weeks == 1 else " weeks"
-            shiny_list.append(str(fancy_delta.weeks) + suffix)
-
-        if fancy_delta.days > 0:
-            suffix = " day" if fancy_delta.days == 1 else " days"
-            shiny_list.append(str(fancy_delta.days) + suffix)
-
-        if fancy_delta.hours > 0:
-            suffix = " hour" if fancy_delta.months == 1 else " hours"
-            shiny_list.append(str(fancy_delta.hours) + suffix)
-
-        if fancy_delta.minutes > 0:
-            suffix = " minute" if fancy_delta.months == 1 else " minutes"
-            shiny_list.append(str(fancy_delta.minutes) + suffix)
-
-        # Only use first two elements (a la RtD)
-        shiny_list = shiny_list[:2]
-
-        return ", ".join(shiny_list) + " ago"
-
-    def __enumerate(self):
-        url_projects = self.api_url + '/projects/?limit=30'
+    def __enumerate_projects(self):
         dict_projects = dict()
         dict_projects["meta"] = dict()
         dict_projects["content"] = list()
 
-        projects = self._get_json_from_url(url=url_projects, headers=[['Authorization', 'Token ' + self.api_key]])
+        # Get the projects
+        url_projects = f'{self.__api_url}/projects/?limit=30'
+        projects = self._get_json_from_url(url=url_projects, headers=self.__headers)
 
         dict_projects["meta"]["project_count"] = projects["count"]
 
-        for item in projects["results"]:
+        field_filter = ['name', 'created', 'modified']
+        for project in projects["results"]:
+            dict_project = self._filter_fields(project, field_filter)
+
             # Get build details
-            dict_last_build = self.__get_build_details(item['slug'])
+            dict_last_build = self.__get_build_details(project['slug'])
             build_status = "success" if dict_last_build['success'] is True else "failed"
-
-            dict_project = dict()
-            dict_project['name'] = item['name']
-
-            dict_project['created'] = item['created']
-            dict_project['last_modified'] = item['modified']
-            dict_project['last_build'] = dict_last_build["date_finished"]
             dict_project['last_build_status'] = build_status
 
-            dict_project['repository'] = item['repository']['url']
-            dict_project['documentation'] = item['urls']['documentation']
-            dict_project['home'] = item['urls']['home']
+            dict_project['last_build'] = dict_last_build["date_finished"]
 
-            users = [user['username'] for user in item['users']]
-            dict_project['users'] = users
+            dict_project['repository'] = project['repository']['url']
+            dict_project['documentation'] = project['urls']['documentation']
+            dict_project['home'] = project['urls']['home']
+
+            dict_project['users'] = [user['username'] for user in project['users']]
 
             dict_projects["content"].append(dict_project)
 
         return dict_projects
 
-    def _build_content(self):
-        inventory = self.__enumerate()
-        return self.__to_markdown(inventory)
-
-    def __to_markdown(self, inventory):
+    def __markdown_projects(self, inventory):
 
         lst_content = list()
 
         # General information
         lst_content.append(">[!info] General information")
-        lst_content.append(">**Overview:** [dashboard](https://readthedocs.org/dashboard)")
-        lst_content.append("**Number of projects:** " + str(inventory["meta"]["project_count"]))
+        lst_content.append(self._item('Overview', self._link('https://readthedocs.org/dashboard', 'dashboard')))
+        lst_content.append(self._item('Number of projects', inventory["meta"]["project_count"]))
         lst_content.append("")
 
         # List the projects
         for item in inventory["content"]:
-            created = parser.parse(item['created']).strftime("%B %-d, %Y")
+
+            lst_content.append(self._header(self._link(item['home'], item['name']), 3))
+            lst_content.append(self._item('Created', self._format_date(item['created'])))
+            lst_content.append(self._item('Modified', self._format_date(item['modified'])))
+            lst_content.append(self._item('Repository', item['repository']))
+
+            # Last build
             if item['last_build']:
-                last_built = parser.parse(item['last_build']).strftime("%a, %b %-d, %Y, %-I:%M %p")
+                last_built = self._format_date(item['last_build'])
             else:
-                last_built = '-'
-            last_modified = parser.parse(item['last_modified']).strftime("%a, %b %-d, %Y, %-I:%M %p")
-
+                last_built = ''
             build_color = "green" if item["last_build_status"] == 'success' else "red"
+            build_status = self._highlight(item["last_build_status"], color='white', background=build_color, border_color='white')
+            lst_content.append(self._item('Last built', f'{last_built} {build_status}'))
 
-            lst_content.append("### [" + item['name'] + "](" + item['home'] + ")")
-            lst_content.append("**Created:** " + created)
-            lst_content.append("**Last modified:** " + last_modified)
-            lst_content.append("**Last built:** " + last_built +
-                               f" <span style=\"color: {build_color}; font-weight: bold\"> " +
-                               "[" + item["last_build_status"] + "] </span>")
-            lst_content.append("**Repository:** " + item['repository'])
-
-            lst_users = ["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']]
-
-            lst_content.append("**Users:** " + ", ".join(lst_users))
+            # Users
+            users = ", ".join(["[" + user + "](https://www.github.com/" + user + ")" for user in item['users']])
+            lst_content.append(self._item('Users', users))
             lst_content.append("")
 
         # return it all
-        platform_file = self._get_env('READTHEDOCS_MD_FILE')
-
+        platform_file = 'readthedocs.md'
         return {platform_file: lst_content}
+
+    def _build_content(self):
+        md_main = dict()
+
+        inventory = self.__enumerate_projects()
+        md_main.update(self.__markdown_projects(inventory))
+
+        return md_main
