@@ -99,7 +99,7 @@ class Zoom(Platform):
             api_url = f'https://api.zoom.us/v2/users/{user_id}/recordings?from={start_date}&to={end_date}?page_size=300'
 
             recordings = self._get_json_from_url(api_url, self.__headers)
-            if recordings['total_records'] > 0:
+            if recordings and recordings['total_records'] > 0:
                 # pprint.pprint(recordings)
 
                 total_recording_number += recordings['total_records']

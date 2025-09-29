@@ -42,8 +42,10 @@ class Platform:
 
         if raw is True:
             return result
-        else:
+        elif result:
             return result.json()
+        else:
+            return None
 
     @staticmethod
     def load_config(platform):
