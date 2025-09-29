@@ -1,6 +1,6 @@
+from .Platform import Platform
 from .DNS import DNS
 from .Netlify import Netlify
-from .Platform import Platform
 from .ReadTheDocs import ReadTheDocs
 from .MySQL import MySQL
 from .Zoom import Zoom
@@ -9,3 +9,4 @@ from .Notion import Notion
 from .DockerHub import DockerHub
 from .Github import Github
 from .Zulip import Zulip
+from .Supabase import Supabase
