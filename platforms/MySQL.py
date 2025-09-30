@@ -1,6 +1,6 @@
 from .Platform import Platform
 import mysql.connector
-from pprint import pprint
+from pprint import pp
 import re
 from collections import OrderedDict
 
@@ -9,11 +9,13 @@ class MySQL(Platform):
     def __init__(self):
         super().__init__()
 
+        self.__config = self.load_config('mysql')
+
         self.db = mysql.connector.connect(
-            host=self._get_env('MYSQL_HOST'),
-            user=self._get_env('MYSQL_USER'),
-            password=self._get_env('MYSQL_PASSWORD'),
-            ssl_ca=self._get_env('MYSQL_SSL_CA_FILE'),
+            host=self.__config['host'],
+            user=self.__config['user'],
+            password=self.__config['password'],
+            ssl_ca=self.__config['ssl_ca_file'],
             ssl_verify_cert=True
         )
 
@@ -96,16 +98,16 @@ class MySQL(Platform):
 
             return lst_tables
 
-    def __users_to_markdown(self, dict_users):
+    def __markdown_users(self, dict_users):
         lst_content = list()
 
         lst_content.append(">[!info] General information")
-        lst_content.append("**Number of users:** " + str(len(dict_users)))
+        lst_content.append(self._item('Number of users', len(dict_users)))
         lst_content.append("")
 
         for user in dict_users:
             lst_content.append("")
-            lst_content.append(f"### `{user}`")
+            lst_content.append(self._header(f'`{user}`', 3))
             lst_content.append("| Table | Permissions | Options |")
             lst_content.append("| --- | --- | --- |")
             for permit in dict_users[user]:
@@ -118,15 +120,15 @@ class MySQL(Platform):
         file = "mysql/users.md"
         return {file: lst_content}
 
-    def __databases_to_markdown(self, dict_databases):
+    def __markdown_databases(self, dict_databases):
         lst_content = list()
 
         lst_content.append(">[!info] General information")
-        lst_content.append("**Number of databases:** " + str(len(dict_databases)))
+        lst_content.append(self._item('Number of databases', len(dict_databases)))
         lst_content.append("")
 
         for db in dict_databases:
-            lst_content.append(f"### {db} ({len(dict_databases[db])} tables)")
+            lst_content.append(self._header(f"{db} ({len(dict_databases[db])} tables)", 3))
 
             for table in dict_databases[db]:
                 lst_content.append(f"- `{table}`")
@@ -140,9 +142,9 @@ class MySQL(Platform):
         md_main = dict()
 
         user_inventory = self.__list_users()
-        md_main.update(self.__users_to_markdown(user_inventory))
+        md_main.update(self.__markdown_users(user_inventory))
 
         db_inventory = self.__list_databases()
-        md_main.update(self.__databases_to_markdown(db_inventory))
+        md_main.update(self.__markdown_databases(db_inventory))
 
         return md_main
