@@ -136,7 +136,7 @@ class Zulip(Platform):
       # Subscribers
       sub_url = f'{self.__config['site']}/api/v1/streams/{channel['stream_id']}/members'
       sub_ids = self._get_json_from_url(sub_url, auth=self.__auth)
-      if 'subscribers' in sub_ids:
+      if sub_ids and 'subscribers' in sub_ids:
         subscriber_ids = sub_ids['subscribers']
 
         members = self.__api_client.get_members(request={'user_ids': subscriber_ids})
