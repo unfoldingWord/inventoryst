@@ -82,7 +82,7 @@ class ReadTheDocs(Platform):
         lst_content.append(self._header('Projects', 3))
         for item in inventory["content"]:
 
-            lst_content.append(self._header(self._link(item['home'], item['name']), 3))
+            lst_content.append(self._header(self._link(item['home'], item['name']), 4))
             lst_content.append(self._item('Created', self._format_date(item['created'])))
             lst_content.append(self._item('Modified', self._format_date(item['modified'])))
             lst_content.append(self._item('Repository', item['repository']))
