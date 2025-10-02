@@ -57,16 +57,29 @@ class ReadTheDocs(Platform):
         return dict_projects
 
     def __markdown_projects(self, inventory):
-
         lst_content = list()
+
+        # First, we MUST build a user list out of this inventory
+        lst_users = list()
+        for item in inventory["content"]:
+            for user in item['users']:
+                if user not in lst_users:
+                    lst_users.append(user)
 
         # General information
         lst_content.append(">[!info] General information")
         lst_content.append(self._item('Overview', self._link('https://readthedocs.org/dashboard', 'dashboard')))
         lst_content.append(self._item('Number of projects', inventory["meta"]["project_count"]))
+        lst_content.append(self._item('Number of users', len(lst_users)))
         lst_content.append("")
 
-        # List the projects
+        # List all users
+        lst_content.append(self._header('Users', 3))
+        for user in lst_users:
+            lst_content.append(self._link(f'https://www.github.com/{user}', user))
+
+        # List projects
+        lst_content.append(self._header('Projects', 3))
         for item in inventory["content"]:
 
             lst_content.append(self._header(self._link(item['home'], item['name']), 3))
