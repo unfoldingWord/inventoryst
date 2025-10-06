@@ -195,11 +195,11 @@ class Cloudflare(Platform):
   def _build_content(self):
     md_main = dict()
 
-    # members = self.__enumerate_members()
-    # md_main.update(self.__markdown_members(members))
-    #
-    # page_projects = self.__enumerate_page_projects()
-    # md_main.update(self.__markdown_page_projects(page_projects))
+    members = self.__enumerate_members()
+    md_main.update(self.__markdown_members(members))
+
+    page_projects = self.__enumerate_page_projects()
+    md_main.update(self.__markdown_page_projects(page_projects))
 
     r2_buckets = self.__enumerate_r2_buckets()
     md_main.update(self.__markdown_r2_buckets(r2_buckets))
