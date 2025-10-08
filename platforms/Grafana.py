@@ -30,9 +30,20 @@ class Grafana(Platform):
 
     field_filter = ['email', 'name', 'login', 'avatarUrl', 'role', 'lastSeenAt', 'lastSeenAtAge', 'isDisabled', 'authLabels']
 
+    inactive_count = 0
     for user in users:
       dict_user = self._filter_fields(user, field_filter)
+
+      # Activity
+      dict_user['inactive'] = False
+      inactive_days = (datetime.now(timezone.utc) - parser.parse(user['lastSeenAt'])).days
+      if inactive_days > self.__config['user']['inactive_days']:
+        dict_user['inactive'] = True
+        inactive_count += 1
+
       dict_return['content'].append(dict_user)
+
+    dict_return['meta']['inactive_user_count'] = inactive_count
 
     return dict_return
 
@@ -139,12 +150,13 @@ class Grafana(Platform):
 
     # Dashboards are organized by folder
     # I'd like to sort by folder name (later)
-
     for folder in dashboards['content']:
 
       # Folder stuff
       lst_content.append(self._header(f'{folder['title']} ({len(folder['dashboards'])})', 3))
       lst_content.append(self._item('URL', f'{self.__config['host']}{folder['url']}'))
+      if 'updated' in folder:
+        lst_content.append(self._item('Last updated', self._format_date(folder['updated'])))
       lst_content.append('')
 
       # Dashboards
@@ -160,8 +172,9 @@ class Grafana(Platform):
 
     # Info block
     lst_content.append(">[!info] General information")
-    lst_content.append(self._item('Number of teams', teams['meta']['team_count']))
-    lst_content.append(self._item('Number of users', users['meta']['user_count']))
+    lst_content.append(self._item('Teams', teams['meta']['team_count']))
+    lst_content.append(self._item('Users', users['meta']['user_count']))
+    lst_content.append(self._item('Inactive users', users['meta']['inactive_user_count']))
     lst_content.append("")
 
     # Teams
@@ -189,8 +202,7 @@ class Grafana(Platform):
       # - Disabled?
       lst_labels.append(self._highlight('Disabled', 'gray', border_color='gray') if user['isDisabled'] else '')
       # - Inactive?
-      inactive_days = (datetime.now(timezone.utc) - parser.parse(user['lastSeenAt'])).days
-      if inactive_days > self.__config['user']['inactive_days']:
+      if user['inactive'] is True:
         lst_labels.append(self._highlight('Inactive', 'orange', border_color='orange'))
 
       name = user['name'] if user['name'] else user['login']
@@ -210,9 +222,9 @@ class Grafana(Platform):
   def _build_content(self):
     md_main = dict()
 
-    # teams = self.__enumerate_teams()
-    # users = self.__enumerate_users()
-    # md_main.update(self.__markdown_teams_users(teams, users))
+    teams = self.__enumerate_teams()
+    users = self.__enumerate_users()
+    md_main.update(self.__markdown_teams_users(teams, users))
 
     dashboards = self.__enumerate_dashboards()
     md_main.update(self.__markdown_dashboards(dashboards))
