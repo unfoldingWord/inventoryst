@@ -11,3 +11,4 @@ from .Github import Github
 from .Zulip import Zulip
 from .Supabase import Supabase
 from .Cloudflare import Cloudflare
+from .Grafana import Grafana
