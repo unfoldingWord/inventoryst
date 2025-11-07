@@ -1,5 +1,5 @@
 from .Platform import Platform
-from github import Github as Gh
+from github import Consts, Github as Gh
 from pprint import pp
 import re
 from dateutil.relativedelta import relativedelta
@@ -22,6 +22,9 @@ class Github(Platform):
 
     # Set org
     self.__obj_org = self.__github_api.get_organization(self.__org)
+
+    # Set Waiting time to 5 (from default 2)
+    Consts.PROCESSING_202_WAIT_TIME = 5
 
     # Need manual API connections for specific purposes
     self.__github_api_url = 'https://api.github.com/'
