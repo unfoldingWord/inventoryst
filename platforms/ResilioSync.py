@@ -32,7 +32,7 @@ class ResilioSync(Platform):
     def __get_token(self):
         ts = int(time.time() * 1000)
         url = f'{self.__api_url}/token.html?t={ts}'
-        pp(url)
+
         token_data = self._get_json_from_url(url, connection=self.__connection, raw=True).content
 
         # Extract token from HTML code
@@ -61,8 +61,6 @@ class ResilioSync(Platform):
         folders = self._get_json_from_url(url_folders, connection=self.__connection)['folders']
         dict_folders['meta']['folder_count'] = len(folders)
 
-        pp(folders)
-
         for folder in folders:
             dict_folder = self._filter_fields(folder, folder_filter)
 
@@ -73,7 +71,6 @@ class ResilioSync(Platform):
             for user in users:
                 peered = next((item for item in folder['peers'] if item["userid"] == user['id']), None)
                 if peered:
-                    pp(peered)
                     user['active'] = True
                     user['peer_name'] = peered['name']
 
