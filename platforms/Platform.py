@@ -22,25 +22,28 @@ class Platform:
         self.__pages_changed = 0
         self.__api_calls = 0
 
-    def _get_json_from_url(self, url, headers=None, data=None, raw=False, auth=None):
+    def _get_json_from_url(self, url, headers=None, data=None, raw=False, auth=None, connection=None):
         # Basic headers
         req_headers = {
             'User-Agent': 'Inventoryst/1.0; https://github.com/unfoldingWord/inventoryst'
         }
+
+        if not connection:
+            connection = requests
 
         if headers:
             for header in headers:
                 req_headers[header[0]] = header[1]
 
         if data is None:
-            result = requests.get(url, headers=req_headers, auth=auth)
+            result = connection.get(url, headers=req_headers, auth=auth)
         else:
-            result = requests.post(url, json=data, headers=req_headers, auth=auth)
+            result = connection.post(url, json=data, headers=req_headers, auth=auth)
 
         self._inc_api_call()
         self._logger.debug(result)
 
-        if raw is True:
+        if raw:
             return result
         elif result:
             return result.json()
