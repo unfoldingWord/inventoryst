@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from platforms import *
+import requests
 import logging
 import traceback
 import datetime
@@ -37,10 +38,14 @@ class Inventoryst:
         return this_logger
 
     def __add_metric(self, key, value):
-        ts = datetime.datetime.now()
+        #ts = datetime.datetime.now()
         self.__metrics['inventoryst'][key] = value
 
     def inventorize(self):
+        # Notify that we have started the job
+        if 'callback' in self.__config and 'start' in self.__config['callback']:
+            requests.get(self.__config['callback']['start'])
+
         lst_inventories_to_fetch = self.__config['inventories']
 
         # Process all requested platforms
@@ -59,7 +64,11 @@ class Inventoryst:
                 api_calls[platform] = obj_platform.get_api_calls()
                 page_change_count += obj_platform.get_changed_page_count()
 
+                success = 1
+
             except Exception as e:
+                success = 0
+
                 self.__logger.error(f"Processing of {platform} encountered an error")
                 self.__logger.error(e)
                 traceback.print_exc()
@@ -73,6 +82,7 @@ class Inventoryst:
             memory_usage = memory_usage_end - memory_usage_start
 
             p_metrics = {
+                'success': success,
                 'duration': f'{duration.seconds}.{round(duration.microseconds, 2)}',
                 'memory_usage': memory_usage
             }
@@ -84,6 +94,14 @@ class Inventoryst:
         self.__logger.info(f"Platforms requested: {len(lst_inventories_to_fetch)} / "
                            f"Platforms processed: {processed_platforms} / "
                            f"Pages changed: {page_change_count}" )
+
+        if 'callback' in self.__config:
+            # Report back how we did
+            if len(lst_inventories_to_fetch) == processed_platforms:
+                requests.post(self.__config['callback']['success'], json=self.__metrics)
+            else:
+                if 'fail' in self.__config['callback']:
+                    requests.post(self.__config['callback']['fail'], json=self.__metrics)
 
 obj_inventoryst = Inventoryst()
 obj_inventoryst.inventorize()
