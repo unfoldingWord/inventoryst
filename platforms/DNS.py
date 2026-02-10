@@ -180,28 +180,32 @@ class DNS(Platform):
                 domain['custom_dns'] = True
 
             # Get the hosts
-            domain['hosts'] = list()
             domain_parked = False
+            if not item['deletion_date']:
+                domain['hosts'] = list()
+                domain_parked = False
 
-            hosts = self.__get_epik_data(f"domains/{item['domain']}/records")['data']['records']
-            for host in hosts:
-                dict_host = dict()
-                dict_host['host'] = host['name']
-                dict_host['type'] = host['type']
-                dict_host['target'] = host['data']
-                dict_host['ttl'] = host['ttl']
+                hosts = self.__get_epik_data(f"domains/{item['domain']}/records")['data']['records']
+                for host in hosts:
+                    dict_host = dict()
+                    dict_host['host'] = host['name']
+                    dict_host['type'] = host['type']
+                    dict_host['target'] = host['data']
+                    dict_host['ttl'] = host['ttl']
 
-                if host['type'] == 'A' and host['data'] == '185.83.214.222':
-                    domain_parked = True
+                    if host['type'] == 'A' and host['data'] == '185.83.214.222':
+                        domain_parked = True
 
-                domain['hosts'].append(dict_host)
+                    domain['hosts'].append(dict_host)
+            else:
+                domain['deletion_date'] = item['deletion_date']
 
             # Determine domain status
             domain['status'] = "active"
             if 'hosts' in domain and len(domain['hosts']) == 0:
                 if domain['custom_dns'] is False:
                     domain['status'] = 'undeveloped'
-            elif domain_parked is True:
+            elif domain_parked:
                 domain['status'] = "parked"
 
             # Finally, add to lst_domains
@@ -316,6 +320,8 @@ class DNS(Platform):
                         lst_content.append(str_fields)
             elif domain['custom_dns'] is True:
                 lst_content.append(f"**Hosts:** _Defined outside {domain['registrar']}_")
+            elif 'deletion_date' in domain:
+                lst_content.append(self._item('Deletion date', self._format_date(domain['deletion_date'])))
 
             lst_content.append("")
 
