@@ -101,7 +101,10 @@ class Inventoryst:
                 requests.post(self.__config['callback']['success'], json=self.__metrics)
             else:
                 if 'fail' in self.__config['callback']:
-                    requests.post(self.__config['callback']['fail'], json=self.__metrics)
+                    failed_platforms = {platform for platform, results in self.__metrics['inventoryst'].items() if
+                                        results['success'] == 0}
+
+                    requests.post(self.__config['callback']['fail'], json=failed_platforms)
 
 obj_inventoryst = Inventoryst()
 obj_inventoryst.inventorize()
