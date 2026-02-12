@@ -1,4 +1,5 @@
 from .Platform import Platform
+from pprint import pp
 
 class ReadTheDocs(Platform):
     def __init__(self):
@@ -16,13 +17,16 @@ class ReadTheDocs(Platform):
 
         dict_builds = self._get_json_from_url(url=url_builds, headers=self.__headers)
 
-        # RtD returns builds in reverse order of build dates. So last build comes first!
-        last_build = dict_builds['results'][0]
+        if dict_builds:
+            # RtD returns builds in reverse order of build dates. So last build comes first!
+            last_build = dict_builds['results'][0]
 
-        return {
-            "success": last_build["success"],
-            "date_finished": last_build["finished"]
-        }
+            return {
+                "success": last_build["success"],
+                "date_finished": last_build["finished"]
+            }
+
+        return None
 
     def __enumerate_projects(self):
         dict_projects = dict()
@@ -37,14 +41,18 @@ class ReadTheDocs(Platform):
 
         field_filter = ['name', 'created', 'modified']
         for project in projects["results"]:
+            self._logger.debug(f'Project: {project['name']}')
             dict_project = self._filter_fields(project, field_filter)
 
             # Get build details
             dict_last_build = self.__get_build_details(project['slug'])
-            build_status = "success" if dict_last_build['success'] is True else "failed"
-            dict_project['last_build_status'] = build_status
-
-            dict_project['last_build'] = dict_last_build["date_finished"]
+            if dict_last_build:
+                build_status = "success" if dict_last_build['success'] is True else "failed"
+                dict_project['last_build_status'] = build_status
+                dict_project['last_build'] = dict_last_build["date_finished"]
+            else:
+                dict_project['last_build_status'] = None
+                dict_project['last_build'] = None
 
             dict_project['repository'] = project['repository']['url']
             dict_project['documentation'] = project['urls']['documentation']
@@ -90,10 +98,15 @@ class ReadTheDocs(Platform):
             # Last build
             if item['last_build']:
                 last_built = self._format_date(item['last_build'])
+                build_color = "green" if item["last_build_status"] == 'success' else "red"
+                status_text = item["last_build_status"]
             else:
                 last_built = ''
-            build_color = "green" if item["last_build_status"] == 'success' else "red"
-            build_status = self._highlight(item["last_build_status"], color='white', background=build_color, border_color='white')
+                build_color = 'orange'
+                status_text = 'Unknown'
+
+            build_status = self._highlight(status_text, color='white', background=build_color,
+                                           border_color='white')
             lst_content.append(self._item('Last built', f'{last_built} {build_status}'))
 
             # Users
