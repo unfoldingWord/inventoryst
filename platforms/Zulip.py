@@ -350,9 +350,11 @@ class Zulip(Platform):
     bots = self.__enumerate_members(bots=True)
     md_main.update(self.__markdown_members(bots, bots=True))
 
+    # Groups
     groups = self.__enumerate_user_groups()
     md_main.update(self.__markdown_groups(groups))
 
+    # Channels
     channels = self.__enumerate_channels()
     md_main.update(self.__markdown_channels(channels))
 
