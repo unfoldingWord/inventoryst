@@ -130,7 +130,7 @@ class Github(Platform):
         # Contributors
         contributors = obj_repo.get_stats_contributors()
         self._inc_api_call()
-        dict_repo['contributors'] = [c.author.login for c in contributors] if contributors else None
+        dict_repo['contributors'] = [c.author.login if c.author else "Unknown" for c in contributors] if contributors else None
 
         # Dependabot alerts (only if the repo is NOT archived)
         if dict_repo['archived'] is False:
