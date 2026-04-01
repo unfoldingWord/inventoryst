@@ -101,8 +101,12 @@ class Inventoryst:
                 requests.post(self.__config['callback']['success'], json=self.__metrics)
             else:
                 if 'fail' in self.__config['callback']:
-                    failed_platforms = {platform for platform, results in self.__metrics['inventoryst'].items() if
-                                        results['success'] == 0}
+
+                    failed_platforms = {'inventoryst':  {platform: results
+                                                         for platform, results
+                                                         in self.__metrics['inventoryst'].items()
+                                                         if results['success'] == 0}
+                                        }
 
                     requests.post(self.__config['callback']['fail'], json=failed_platforms)
 
