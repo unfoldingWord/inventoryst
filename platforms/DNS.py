@@ -1,7 +1,7 @@
 from .Platform import Platform
 import requests
 import xmltodict
-# from pprint import pprint
+from pprint import pp
 import datetime
 import time
 
@@ -27,6 +27,9 @@ class DNS(Platform):
     def __get_json_from_xml(self, url):
         raw = requests.get(url)
         results = xmltodict.parse(raw.content)
+
+        self._logger.debug(results)
+        self._inc_api_call()
 
         return results
 
@@ -65,7 +68,7 @@ class DNS(Platform):
             time.sleep(60)
             dict_results = self.__get_json_from_xml(namecheap_api_url)
 
-        # indicates succesful call
+        # indicates successful call
         self.__namecheap_api_counter += 1
 
         return dict_results
@@ -109,11 +112,20 @@ class DNS(Platform):
             domain['hosts'] = list()
             domain['custom_dns'] = False
             domain_parked = False
+
             if domain_hosts["ApiResponse"]["@Status"] == 'OK':
                 if 'host' in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]:
-                    for host in domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["host"]:
+                    hosts = domain_hosts["ApiResponse"]["CommandResponse"]["DomainDNSGetHostsResult"]["host"]
+
+                    # Seems xmltodict is returning a dict when only one host is encountered.
+                    # Fixing that by wrapping it into a list myself
+                    if isinstance(hosts, dict):
+                        hosts = [hosts]
+
+                    for host in hosts:
                         # Sometimes the API gives weird data back...
                         if not type(host) is dict:
+
                             str_host = str(host)
                             self._logger.warning(
                                 f"Unexpected value for host in domain '{domain['name']}': {str_host} ({type(host)})")
@@ -142,7 +154,7 @@ class DNS(Platform):
             if 'hosts' in domain and len(domain['hosts']) == 0:
                 if domain['custom_dns'] is False:
                     domain['status'] = 'undeveloped'
-            elif domain_parked is True:
+            elif domain_parked:
                 domain['status'] = "parked"
 
             # Finally, add to lst_domains
@@ -176,7 +188,7 @@ class DNS(Platform):
             # Other DNS host
             domain['custom_dns'] = False
             ns_epik = len([server for server in domain['nameservers'] if not server.lower().find('epik.com') == -1])
-            if bool(ns_epik) is False:
+            if not bool(ns_epik):
                 domain['custom_dns'] = True
 
             # Get the hosts
@@ -220,16 +232,15 @@ class DNS(Platform):
 
         lst_domains = list()
 
+        # Namecheap
         self._logger.info("Getting domain info from Namecheap")
         lst_namecheap_domains = self.__enumerate_namecheap_domains()
         lst_domains += lst_namecheap_domains
 
         # Epik
-        # It appears that Epik API cannot be used from Europe and/or Netherlands.
-        if not self._stage == 'dev':
-            self._logger.info("Getting domain info from Epik")
-            lst_epik_domains = self.__enumerate_epik_domains()
-            lst_domains += lst_epik_domains
+        # self._logger.info("Getting domain info from Epik")
+        # lst_epik_domains = self.__enumerate_epik_domains()
+        # lst_domains += lst_epik_domains
 
         dict_return["meta"]["domain_count"] = len(lst_domains)
         dict_return["content"] = lst_domains
