@@ -238,9 +238,9 @@ class DNS(Platform):
         lst_domains += lst_namecheap_domains
 
         # Epik
-        # self._logger.info("Getting domain info from Epik")
-        # lst_epik_domains = self.__enumerate_epik_domains()
-        # lst_domains += lst_epik_domains
+        self._logger.info("Getting domain info from Epik")
+        lst_epik_domains = self.__enumerate_epik_domains()
+        lst_domains += lst_epik_domains
 
         dict_return["meta"]["domain_count"] = len(lst_domains)
         dict_return["content"] = lst_domains
