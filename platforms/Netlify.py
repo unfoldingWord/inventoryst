@@ -67,7 +67,7 @@ class Netlify(Platform):
 
                 label_active = self._highlight(f'{status}', color=status_color, border_color=status_color)
             else:
-                label_active = self._highlight('Unknown', 'orange', border_color='orange')
+                label_active = self._highlight('Obsolete', 'red', border_color='red')
 
             # Name and email
             lst_content.append(self._header(f'{user['name']} {label_2fa} {label_active}', 3))
@@ -129,11 +129,16 @@ class Netlify(Platform):
         lst_sites = self._get_json_from_url(url=url_sites, headers=self.__headers)
 
         dict_sites["meta"]["site_count"] = len(lst_sites)
+        dict_sites["meta"]["site_count_disabled"] = 0
+        dict_sites["meta"]["site_count_undeployed"] = 0
 
-        field_filter = ['created_at', 'default_domain', 'site_id', 'name', 'ssl_url', 'disabled']
+        field_filter = ['created_at', 'default_domain', 'custom_domain', 'site_id', 'name', 'ssl_url', 'disabled']
         for site in lst_sites:
 
             dict_site = self._filter_fields(site, field_filter)
+
+            if dict_site['disabled']:
+                dict_sites["meta"]["site_count_disabled"] += 1
 
             dict_site['created_at'] = self._format_date(dict_site['created_at'])
 
@@ -148,6 +153,8 @@ class Netlify(Platform):
             lst_deploys = self.__get_deploys_for_site(site['site_id'])
             if len(lst_deploys) > 0:
                 dict_site['deploys'] = lst_deploys
+            else:
+                dict_sites["meta"]["site_count_undeployed"] += 1
 
             # TLS certificate
             dict_cert = self.__get_ssl_cert(site['site_id'])
@@ -165,7 +172,9 @@ class Netlify(Platform):
 
         lst_content.append(">[!info] General information")
         lst_content.append(self._item('Overview', self._link(f'https://app.netlify.com/teams/{self.__team}/sites', 'Sites')))
-        lst_content.append(self._item('Number of sites', inventory["meta"]["site_count"]))
+        lst_content.append(self._item('Sites', inventory["meta"]["site_count"]))
+        lst_content.append(self._item('Disabled sites', inventory["meta"]["site_count_disabled"]))
+        lst_content.append(self._item('Undeployed sites', inventory["meta"]["site_count_undeployed"]))
         lst_content.append("")
 
         # Sort alphabetically on the name
@@ -174,11 +183,13 @@ class Netlify(Platform):
         for site in sites_sorted:
 
             label_disabled = self._highlight('Disabled', 'gray', border_color='gray') if site['disabled'] else ''
+            label_undeployed = self._highlight('Undeployed', 'orange', border_color='orange') if not 'deploys' in site else ''
 
             site_title = self._link(f'https://app.netlify.com/sites/{site['name']}/overview', site['name'])
-            lst_content.append(self._header(f'{site_title} {label_disabled}'))
+            lst_content.append(self._header(f'{site_title} {label_disabled} {label_undeployed}'))
             lst_content.append(self._item('URL', site['ssl_url']))
             lst_content.append(self._item('Netlify domain', site['default_domain']))
+            lst_content.append(self._item('Custom domain', site['custom_domain']))
             lst_content.append(self._item('ID', f"`{site['site_id']}`"))
             lst_content.append(self._item('Created', site['created_at']))
             if 'updated' in site:
