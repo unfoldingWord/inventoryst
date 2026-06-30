@@ -64,6 +64,54 @@ class Cloudflare(Platform):
 
     return dict_return
 
+  def __enumerate_d1_databases(self):
+    dict_return = dict()
+    dict_return['meta'] = dict()
+    dict_return['content'] = list()
+
+    # D1 databases
+    d1_dbs =  json.loads(self.__cf_agent.d1.database.list(account_id=self.__cf_account_id).model_dump_json())['result']
+    self._inc_api_call()
+
+    dict_return['meta']['d1_count'] = len(d1_dbs)
+
+    field_filter = ['created_at', 'name', 'version', 'file_size']
+
+    for d1 in d1_dbs:
+      dict_db = self._filter_fields(d1, field_filter)
+
+      # collect extra DB data
+      db_extra = json.loads(self.__cf_agent.d1.database.get(account_id=self.__cf_account_id, database_id=d1['uuid']).model_dump_json())
+      self._inc_api_call()
+
+      dict_db['num_tables'] = db_extra['num_tables']
+
+      dict_return['content'].append(dict_db)
+
+    # Return
+    return dict_return
+
+  def __enumerate_domains(self):
+    dict_return = dict()
+    dict_return['meta'] = dict()
+    dict_return['content'] = list()
+
+    # Domains
+    zones =  json.loads(self.__cf_agent.zones.list(account=self.__cf_account_id).model_dump_json())['result']
+    self._inc_api_call()
+
+    dict_return['meta']['domain_count'] = len(zones)
+
+    field_filter = ['created_on', 'modified_on', 'status', 'name']
+
+    for zone in zones:
+      dict_zone = self._filter_fields(zone, field_filter)
+
+      dict_return['content'].append(dict_zone)
+
+    # Return
+    return dict_return
+
   def __enumerate_workers(self):
     dict_return = dict()
     dict_return['meta'] = dict()
@@ -125,6 +173,63 @@ class Cloudflare(Platform):
 
     return dict_return
 
+  def __enumerate_kv_namespaces(self):
+    dict_return = dict()
+    dict_return['meta'] = dict()
+    dict_return['content'] = list()
+
+    kv_namespaces = json.loads(self.__cf_agent.kv.namespaces.list(account_id=self.__cf_account_id).model_dump_json())['result']
+    self._inc_api_call()
+
+    dict_return['meta']['ns_count'] = len(kv_namespaces)
+
+    for kv_ns in kv_namespaces:
+      keys = json.loads(self.__cf_agent.kv.namespaces.keys.list(account_id=self.__cf_account_id, namespace_id=kv_ns['id']).model_dump_json())['result']
+      self._inc_api_call()
+
+      kv_ns['keys_amount'] = len(keys)
+
+      dict_return['content'].append(kv_ns)
+
+    return dict_return
+
+  def __enumerate_durable_objects(self):
+    dict_return = dict()
+    dict_return['meta'] = dict()
+    dict_return['content'] = list()
+
+    do_namespaces = json.loads(self.__cf_agent.durable_objects.namespaces.list(account_id=self.__cf_account_id).model_dump_json())['result']
+    self._inc_api_call()
+
+    dict_return['meta']['ns_count'] = len(do_namespaces)
+
+    for do_ns in do_namespaces:
+      dict_return['content'].append(do_ns)
+
+    return dict_return
+
+  def __enumerate_workflows(self):
+    dict_return = dict()
+    dict_return['meta'] = dict()
+    dict_return['content'] = list()
+
+    workflows = json.loads(self.__cf_agent.workflows.list(account_id=self.__cf_account_id).model_dump_json())['result']
+    self._inc_api_call()
+
+    field_filter = ['created_on', 'modified_on', 'name', 'script_name', 'triggered_on']
+
+    dict_return['meta']['workflow_count'] = len(workflows)
+
+    for workflow in workflows:
+      dict_workflow = self._filter_fields(workflow, field_filter)
+
+      dict_workflow['complete'] = workflow['instances']['complete']
+      dict_workflow['errored'] = workflow['instances']['errored']
+
+      dict_return['content'].append(dict_workflow)
+
+    return dict_return
+
   def __code_to_location(self, code):
     dict_map = {
       'APAC': 'Asia-Pacific',
@@ -136,6 +241,93 @@ class Cloudflare(Platform):
     }
 
     return dict_map[code]
+
+  def __markdown_workflows(self, workflows):
+    lst_content = list()
+
+    lst_content.append(">[!info] General information")
+    lst_content.append(self._item('Workflows', workflows['meta']['workflow_count']))
+    lst_content.append('')
+
+    for wf in workflows['content']:
+
+      lst_content.append(f'### {wf['name']}')
+
+      lst_content.append(self._item('Created', self._format_date(wf['created_on'])))
+      lst_content.append(self._item('Modified', self._format_date(wf['modified_on'])))
+      lst_content.append(self._item('Script', f"`{wf['script_name']}`"))
+      lst_content.append(self._item('Last triggered', self._format_date(wf['triggered_on'])))
+      lst_content.append(self._item('Completed', round(wf['complete'])))
+      lst_content.append(self._item('Failed', round(wf['errored'])))
+
+    page = 'cloudflare/workflows.md'
+    return {page: lst_content}
+
+  def __markdown_do_namespaces(self, do_namespaces):
+    lst_content = list()
+
+    lst_content.append(">[!info] General information")
+    lst_content.append(self._item('Namespaces', do_namespaces['meta']['ns_count']))
+    lst_content.append('')
+
+    for do_ns in do_namespaces['content']:
+      lst_content.append(f'### {do_ns['name']}')
+
+      lst_content.append(self._item('Script', do_ns['script']))
+      lst_content.append(self._item('Class', do_ns['class']))
+      lst_content.append(self._item('SQLite', do_ns['use_sqlite']))
+
+    page = 'cloudflare/durable_objects.md'
+    return {page: lst_content}
+
+  def __markdown_kv_namespaces(self, kv_namespaces):
+    lst_content = list()
+
+    lst_content.append(">[!info] General information")
+    lst_content.append(self._item('Namespaces', kv_namespaces['meta']['ns_count']))
+    lst_content.append('')
+
+    for kv_ns in kv_namespaces['content']:
+      lst_content.append(f'### {kv_ns['title']}')
+
+      lst_content.append(self._item('Keys', kv_ns['keys_amount']))
+
+    page = 'cloudflare/kv.md'
+    return {page: lst_content}
+
+  def __markdown_domains(self, domains):
+    lst_content = list()
+
+    lst_content.append(">[!info] General information")
+    lst_content.append(self._item('Databases', domains['meta']['domain_count']))
+    lst_content.append('')
+
+    for domain in domains['content']:
+      lst_content.append(f'### {domain['name']}')
+
+      lst_content.append(self._item('Created', self._format_date(domain['created_on'])))
+      lst_content.append(self._item('Modified', self._format_date(domain['modified_on'])))
+      lst_content.append(self._item('Status', domain['status']))
+
+    page = 'cloudflare/domains.md'
+    return {page: lst_content}
+
+  def __markdown_d1_databases(self, d1_dbs):
+    lst_content = list()
+
+    lst_content.append(">[!info] General information")
+    lst_content.append(self._item('Databases', d1_dbs['meta']['d1_count']))
+    lst_content.append('')
+
+    for db in d1_dbs['content']:
+      lst_content.append(f'### {db['name']}')
+
+      lst_content.append(self._item('Created', self._format_date(db['created_at'])))
+      lst_content.append(self._item('Size', self._format_bytes(db['file_size'])))
+      lst_content.append(self._item('Tables', round(db['num_tables'])))
+
+    page = 'cloudflare/d1.md'
+    return {page: lst_content}
 
   def __markdown_workers(self, workers):
     lst_content = list()
@@ -268,5 +460,20 @@ class Cloudflare(Platform):
 
     r2_buckets = self.__enumerate_r2_buckets()
     md_main.update(self.__markdown_r2_buckets(r2_buckets))
+
+    d1_dbs = self.__enumerate_d1_databases()
+    md_main.update(self.__markdown_d1_databases(d1_dbs))
+
+    domains = self.__enumerate_domains()
+    md_main.update(self.__markdown_domains(domains))
+
+    kv_namespaces = self.__enumerate_kv_namespaces()
+    md_main.update(self.__markdown_kv_namespaces(kv_namespaces))
+
+    do_namespaces = self.__enumerate_durable_objects()
+    md_main.update(self.__markdown_do_namespaces(do_namespaces))
+
+    workflows = self.__enumerate_workflows()
+    md_main.update(self.__markdown_workflows(workflows))
 
     return md_main
