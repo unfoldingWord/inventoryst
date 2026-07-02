@@ -177,8 +177,14 @@ class Netlify(Platform):
         lst_content.append(self._item('Undeployed sites', inventory["meta"]["site_count_undeployed"]))
         lst_content.append("")
 
+        # Split out based on Disabled. Disabled sites are shown at the bottom
+        sites_enabled = [site for site in inventory['content'] if site['disabled'] is None]
+        sites_disabled = [site for site in inventory['content'] if site['disabled'] is True]
+
         # Sort alphabetically on the name
-        sites_sorted = sorted(inventory["content"], key=lambda item: item["name"])
+        sites_enabled_sorted = sorted(sites_enabled, key=lambda item: item["name"])
+        sites_disabled_sorted = sorted(sites_disabled, key=lambda item: item["name"])
+        sites_sorted = sites_enabled_sorted + sites_disabled_sorted
 
         for site in sites_sorted:
 
@@ -255,7 +261,7 @@ class Netlify(Platform):
         md_main.update(self.__markdown_sites(inventory))
 
         # users
-        inventory = self.__enumerate_users()
-        md_main.update(self.__markdown_users(inventory))
+        # inventory = self.__enumerate_users()
+        # md_main.update(self.__markdown_users(inventory))
 
         return md_main
