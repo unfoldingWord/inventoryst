@@ -261,7 +261,7 @@ class Netlify(Platform):
         md_main.update(self.__markdown_sites(inventory))
 
         # users
-        # inventory = self.__enumerate_users()
-        # md_main.update(self.__markdown_users(inventory))
+        inventory = self.__enumerate_users()
+        md_main.update(self.__markdown_users(inventory))
 
         return md_main
