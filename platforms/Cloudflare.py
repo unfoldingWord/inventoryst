@@ -256,7 +256,11 @@ class Cloudflare(Platform):
       lst_content.append(self._item('Created', self._format_date(wf['created_on'])))
       lst_content.append(self._item('Modified', self._format_date(wf['modified_on'])))
       lst_content.append(self._item('Script', f"`{wf['script_name']}`"))
-      lst_content.append(self._item('Last triggered', self._format_date(wf['triggered_on'])))
+      if wf['triggered_on']:
+        trigger_date = self._format_date(wf['triggered_on'])
+      else:
+        trigger_date = '-'
+      lst_content.append(self._item('Last triggered', trigger_date))
       lst_content.append(self._item('Completed', round(wf['complete'])))
       lst_content.append(self._item('Failed', round(wf['errored'])))
 
@@ -449,29 +453,29 @@ class Cloudflare(Platform):
   def _build_content(self):
     md_main = dict()
 
-    members = self.__enumerate_members()
-    md_main.update(self.__markdown_members(members))
-
-    page_projects = self.__enumerate_page_projects()
-    md_main.update(self.__markdown_page_projects(page_projects))
-
-    workers = self.__enumerate_workers()
-    md_main.update(self.__markdown_workers(workers))
-
-    r2_buckets = self.__enumerate_r2_buckets()
-    md_main.update(self.__markdown_r2_buckets(r2_buckets))
-
-    d1_dbs = self.__enumerate_d1_databases()
-    md_main.update(self.__markdown_d1_databases(d1_dbs))
-
-    domains = self.__enumerate_domains()
-    md_main.update(self.__markdown_domains(domains))
-
-    kv_namespaces = self.__enumerate_kv_namespaces()
-    md_main.update(self.__markdown_kv_namespaces(kv_namespaces))
-
-    do_namespaces = self.__enumerate_durable_objects()
-    md_main.update(self.__markdown_do_namespaces(do_namespaces))
+    # members = self.__enumerate_members()
+    # md_main.update(self.__markdown_members(members))
+    #
+    # page_projects = self.__enumerate_page_projects()
+    # md_main.update(self.__markdown_page_projects(page_projects))
+    #
+    # workers = self.__enumerate_workers()
+    # md_main.update(self.__markdown_workers(workers))
+    #
+    # r2_buckets = self.__enumerate_r2_buckets()
+    # md_main.update(self.__markdown_r2_buckets(r2_buckets))
+    #
+    # d1_dbs = self.__enumerate_d1_databases()
+    # md_main.update(self.__markdown_d1_databases(d1_dbs))
+    #
+    # domains = self.__enumerate_domains()
+    # md_main.update(self.__markdown_domains(domains))
+    #
+    # kv_namespaces = self.__enumerate_kv_namespaces()
+    # md_main.update(self.__markdown_kv_namespaces(kv_namespaces))
+    #
+    # do_namespaces = self.__enumerate_durable_objects()
+    # md_main.update(self.__markdown_do_namespaces(do_namespaces))
 
     workflows = self.__enumerate_workflows()
     md_main.update(self.__markdown_workflows(workflows))
